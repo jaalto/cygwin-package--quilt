@@ -1,5 +1,5 @@
 sdesc: "Tool to work with series of patches"
-ldesc: "Program manages a series of patches by keeping track of the 
+ldesc: "Program manages a series of patches by keeping track of the
 changes each of them makes. They are logically organized as a stack,
 and you can apply, un-apply, refresh them easily by traveling into the
 stack (push/pop). Quilt is good for managing additional patches
@@ -8,4 +8,4 @@ version control system. The stacked organization proved to be
 efficient for the management of very large patch sets (more than
 hundred patches)."
 category: Devel
-requires: cygwin bzip2 diffutils patch perl
+requires: cygwin bzip2 diffutils patch perl util-linux
