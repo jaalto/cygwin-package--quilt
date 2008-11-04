@@ -26,7 +26,8 @@ is unique. All commands print some help text with "quilt <cmd> -h".
 CHANGES SINCE LAST RELEASE
 ==========================
 
-None.
+- Add missing util-linux dependency for setup.exe installation.
+- Apply all Debian patches.
 
 INSTALL OR UPGRADE NOTES
 ========================

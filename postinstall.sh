@@ -108,3 +108,20 @@ Main()
 Main "$@"
 
 # End of file
+#:etc
+fromdir=/etc/defaults
+for i in   etc etc/preremove etc/preremove/quilt.sh etc/preremove/quilt-manifest.lst etc/preremove/quilt-manifest-from.lst etc/bash_completion.d etc/bash_completion.d/quilt etc/defaults etc/defaults/quilt.quiltrc
+do
+    src=$fromdir/$i
+    dest=/$i
+
+    [ -e $dest ] && continue
+
+    if [ -d $src ] ; then
+	install -d -m 755 $dest
+	continue
+    fi
+
+    install -m 644 $src $dest
+done
+

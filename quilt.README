@@ -93,6 +93,8 @@ Port Notes:
 ----- version 0.46-2 -----
 - Updated 2008-11-04 Jari Aalto
 - setup.hint, README: Add 'util-linux' dependency for getopt.
+- README: Add URLs to Vcs repository etc.
+- Apply Debian patches. Installed patches/*
 
 ----- version 0.46-1 -----
 - New upstream release.
@@ -110,3 +112,4 @@ Port Notes:
   http://sourceware.org/ml/cygwin-apps/2006-02/msg00073.html (GTG)
 
 Cygwin port maintained by: Jari Aalto <jari.aalto@cante.net>
+Copyright (C) 2006-2008 ari Aalto; Licensed under GPL v2 or later

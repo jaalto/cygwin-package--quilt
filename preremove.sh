@@ -1,4 +1,5 @@
 #!/bin/sh
+#
 # Cygwin setup.exe runs this file just before package is being removed.
 # The shell must be 'sh'.
 #
@@ -23,7 +24,7 @@ Environment()
         dest=$(echo $dest | sed -e 's,/$,,' )
     fi
 
-    package="quilt"        #!! CHANGE THIS
+    package="quilt"
 
     #   This file will be installed as
     #   /etc/preremove/<package>.sh so derive <package>
@@ -70,21 +71,21 @@ RemoveConffiles ()
     [ ! -f $conffiles_to ] && return
 
     #  If user hasn't changed the system wide configuration file,
-    #  then remove it (postinstall will install new one). Find reports:
+    #  then remove it (postinstall will install new one):
     #
     #  /usr/share/doc/package-0.17.3/
     #  /usr/share/doc/package-0.92.4/
     #  /usr/share/doc/package-0.96.1/
     #  ...
     #
-    #  So take the last one and delete trailing slash.
+    #  Take the last one and delete trailing slash.
 
     latest=$(LC_ALL=C find $dest/usr/share/doc/$package*/ \
                -maxdepth 0 -type d \
              | sort | tail -1 | sed 's,/$,,')
 
     if [ ! "$latest" ]; then
-        Warn "$0: [FATAL]] Cannot find $package install doc dir"
+        Warn "$0: [FATAL] Cannot find $package install doc dir"
         exit 1
     fi
 
@@ -105,23 +106,24 @@ RemoveConffiles ()
         while read from to
         do
 
-          echo $from
-          echo $to
-
             from=$(echo $from | sed "s,\$PKGDOCDIR,$pkgdocdir$latest," )
             to=$(echo $dest$to | sed "s,\$PKG,$pkgdocdir," )
 
+            [ ! "$from" ] && return
+            [ ! "$to"   ] && return
+
             if [ -f $to ] && [ -f $from ] ; then
-                diff $from $to > /dev/null
+                cmp --quiet $from $to
 
                 if [ "$?" = "0" ]; then
-                    Run rm -f "$to"
+                    #  No changes
+                    Run rm --verbose --force "$to"
                 else
                     Warn "$0: [$package:WARN] $to has changed." \
                          "Not installing new $from"
                 fi
             fi
-        done
+        done ;
     }
 
     rm -f $tmpprefix.*
@@ -129,7 +131,7 @@ RemoveConffiles ()
 
 Main ()
 {
-    Environment "$@"    &&
+    Environment "$@" &&
     RemoveConffiles
 }
 
