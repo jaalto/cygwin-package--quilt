@@ -1,0 +1,67 @@
+To: cygwin-announce@cygwin.com
+Subject: New packages: quilt-0.43 -- Tool to work with series of patches
+
+PACKAGE DESCRIPTION
+===================
+
+Homepage: http://freshmeat.net/projects/quilt/
+License : GPL
+
+Tool to work with series of patches
+
+Program manages a series of patches by keeping track of the changes each
+of them makes. They are logically organized as a stack, and you can
+apply, un-apply, refresh them easily by traveling into the stack
+(push/pop). Quilt is good for managing additional patches applied to a
+package received as a tarball or maintained in another version control
+system. The stacked organization proved to be efficient for the
+management of very large patch sets (more than hundred patches).
+
+With quilt, all work occurs within a single directory tree. Since
+version 0.30, commands can be invoqued from anywhere within the source
+tree. Commands are of the form quilt cmd, similar to CVS commands.
+They can be abbreviated as long as the specified part of the command
+is unique. All commands print some help text with "quilt <cmd> -h".
+
+CHANGES SINCE LAST RELEASE
+==========================
+
+None.
+
+INSTALL OR UPGRADE NOTES
+========================
+
+None.
+
+CYGWIN INSTALLATION INFORMATION
+===============================
+
+To install this package, click on the "Install Cygwin now" link on the
+<http://cygwin.com/> web page. This downloads setup.exe to your
+system. Then, run setup and answer all of the questions. You'll find
+the package listed in the "All" category. After installation, read the
+documentation at directories:
+
+    /usr/share/doc/<package-version>/*
+    /usr/share/doc/Cygwin/<package-version>.README
+
+If you have questions or comments, please send them to the Cygwin
+mailing list at <cygwin@cygwin.com>.
+
+CYGWIN-ANNOUNCE UNSUBSCRIBE INFO
+================================
+
+This message has been sent to cygwin-announce list.
+
+If you want to unsubscribe from the mailing list, look at the
+"List-Unsubscribe: " tag in the email header of this message. Send
+email to the address specified there. It will be in the format:
+
+    cygwin-announce-unsubscribe-you=yourdomain.com@cygwin.com
+
+More information on unsubscribing can be found:
+
+    http://sources.redhat.com/lists.html#unsubscribe-simple
+
+Please read *all* of the information on unsubscribing that is available
+starting at the above URL.
