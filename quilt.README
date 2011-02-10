@@ -71,15 +71,15 @@ Language:
 ------------------------------------
 
 Build instructions:
-  unpack quilt-0.46-1-src.tar.bz2
+  unpack quilt-0.48-1-src.tar.bz2
     if you use setup to install this src package, it will be
     unpacked under /usr/src automatically
   cd /usr/src
   ./quilt*.sh all
 
 This will create:
-  quilt-0.46-1.tar.bz2
-  quilt-0.46-1-src.tar.bz2
+  quilt-0.48-1.tar.bz2
+  quilt-0.48-1-src.tar.bz2
 
 -------------------------------------------
 
@@ -89,6 +89,9 @@ Files included in the binary distro:
 ------------------
 
 Port Notes:
+
+----- version 0.48-1 -----
+- New upstream release 2011-02-10 Jari Aalto
 
 ----- version 0.46-2 -----
 - Updated 2008-11-04 Jari Aalto
@@ -113,4 +116,4 @@ Port Notes:
   http://sourceware.org/ml/cygwin-apps/2006-02/msg00073.html (GTG)
 
 Cygwin port maintained by: Jari Aalto <jari.aalto@cante.net>
-Copyright (C) 2006-2008 ari Aalto; Licensed under GPL v2 or later
+Copyright (C) 2006-2011 ari Aalto; Licensed under GPL v2 or later
