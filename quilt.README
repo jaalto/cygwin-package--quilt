@@ -90,6 +90,9 @@ Files included in the binary distro:
 
 Port Notes:
 
+----- version 0.48-2 -----
+- Correct postinstall.sh 2011-03-18 Jari Aalto
+
 ----- version 0.48-1 -----
 - New upstream release 2011-02-10 Jari Aalto
 

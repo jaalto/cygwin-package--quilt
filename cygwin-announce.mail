@@ -1,5 +1,5 @@
 To: cygwin-announce@cygwin.com
-Subject: Updated: quilt-0.46-2 0.48-1 -- Tool to work with series of patches
+Subject: Updated: quilt-0.46-2 0.48-2 -- Tool to work with series of patches
  
 PACKAGE DESCRIPTION
 ===================
@@ -26,8 +26,7 @@ is unique. All commands print some help text with "quilt <cmd> -h".
 CHANGES SINCE LAST RELEASE
 ==========================
 
-- Add missing util-linux dependency for setup.exe installation.
-- Apply all Debian patches.
+- [Cygwin] Correct postinstall script.
 
 INSTALL OR UPGRADE NOTES
 ========================
