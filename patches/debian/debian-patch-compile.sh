@@ -15,7 +15,7 @@ Main ()
     [ "$file" ] || return 1
 
     ver=$( echo $file | sed -e "s,$NAME[_-],," -e s",$EXT,," )
-    PATCH=$NAME-$ver-debian-patches.patch
+    PATCH=$NAME-$ver-debian-patches.diff
 
     [ "$ver" ] || return 2
 
