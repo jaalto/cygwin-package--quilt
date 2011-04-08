@@ -6,6 +6,11 @@
 #
 #       build.sh <PACKAGE> <VERSION> <RELEASE>
 
-make all lib/backup-files
+# See http://www.mail-archive.com/quilt-dev@nongnu.org/msg01314.html
+
+echo ":" > ./git-desc
+chmod u+x ./git-desc
+
+make all
 
 # End of file
