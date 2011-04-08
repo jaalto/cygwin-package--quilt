@@ -10,18 +10,21 @@ set -e
 
 #:etc
 fromdir=/etc/defaults
-for i in  etc etc/bash_completion.d etc/bash_completion.d/quilt etc/defaults etc/defaults/quilt.quiltrc
+for i in  etc/ etc/bash_completion.d/ etc/bash_completion.d/quilt etc/defaults/ etc/defaults/quilt.quiltrc
 do
-    src=$fromdir/$i
-    destdir=$dest/$i
+    from=$fromdir/$i
+    to=$dest/$i
 
-    [ -e $destdir ] && continue
-
-    if [ -d $src ] ; then
-	install -d -m 755 $destdir
-	continue
-    fi
-
-    install -m 644 $src $destdir
+    case "$i" in
+	*/) # Directory
+	    [ -d $to ] && continue
+	    install -d -m 755 $to
+	    continue
+	    ;;
+	*)  # File
+	    install -m 644 $from $to
+	    ;;
+    esac
 done
+
 
