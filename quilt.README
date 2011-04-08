@@ -19,19 +19,21 @@ is unique. All commands print some help text with "quilt cmd -h".
 
 An example:
 
-  $ cat some.txt
-  $ quilt new mychange.dif
-  $ EDITOR=vi quit edit some.text
-    ... edit, exit
-  $ quilt refresh
-  $ ls patches/*
-  $ quilt diff -z
-  $ quilt refresh
-  $ quilt pop                   # remove patch
-  $ quilt push                  # reapply
+  cat some.txt
+  quilt new mychange.dif
+
+  EDITOR=vi quit edit some.text
+  ... edit, exit
+  quilt refresh
+
+  ls patches/*
+
+  quilt diff -z
+  quilt refresh
+  quilt pop                   # remove patch
+  quilt push                  # reapply
 
 Runtime requirements:
-  cygwin
   bzip2
   diffutils
   patch
@@ -65,21 +67,21 @@ License:
 
 Language:
   C
-  sh-shell
+  Bourne Shell
   Perl
 
 ------------------------------------
 
 Build instructions:
-  unpack quilt-0.48-1-src.tar.bz2
+  unpack quilt-0.48-3-src.tar.bz2
     if you use setup to install this src package, it will be
     unpacked under /usr/src automatically
   cd /usr/src
   ./quilt*.sh all
 
 This will create:
-  quilt-0.48-1.tar.bz2
-  quilt-0.48-1-src.tar.bz2
+  quilt-0.48-3.tar.bz2
+  quilt-0.48-3-src.tar.bz2
 
 -------------------------------------------
 
@@ -89,6 +91,10 @@ Files included in the binary distro:
 ------------------
 
 Port Notes:
+
+----- version 0.48-3 -----
+- Rewrite preremove and postinstall 2011-04-08 Jari Aalto
+- Include Debian patches quilt_0.48-7
 
 ----- version 0.48-2 -----
 - Correct postinstall.sh 2011-03-18 Jari Aalto
@@ -119,4 +125,4 @@ Port Notes:
   http://sourceware.org/ml/cygwin-apps/2006-02/msg00073.html (GTG)
 
 Cygwin port maintained by: Jari Aalto <jari.aalto@cante.net>
-Copyright (C) 2006-2011 ari Aalto; Licensed under GPL v2 or later
+Copyright (C) 2006-2011 Jari Aalto; Licensed under GPL v2 or later
