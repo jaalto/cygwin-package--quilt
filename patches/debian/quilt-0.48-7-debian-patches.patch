@@ -1,0 +1,2204 @@
+Description: Fix auto-generation of quilt.1 to work with dash
+ The echo command of dash interprets \f as a special characer and
+ thus generates a bad manual page. bash's echo leaves them unchanged
+ (it needs -e to replace those special characters). Using printf
+ instead is a portable solution that work with both shells.
+ .
+ The code also uses a bashism ($'') but it's not really needed with
+ GNU sed at least (it understands \t and \n) so drop it and avoid some
+ painful double escaping.
+ .
+ This patch should be sent upstream.
+Author: Raphaël Hertzog <hertzog@debian.org>
+Forwarded: no
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/quilt/+bug/402237
+Bug-Debian: http://bugs.debian.org/563517
+
+---
+ Makefile.in |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -195,7 +195,7 @@ doc/README : doc/README.in $(QUILT:%=qui
+ 			$(MAKE) -s reference				\
+ 			;;						\
+ 		*)							\
+-			echo $$line					\
++			printf "%s\n" "$$line"				\
+ 			;;						\
+ 		esac ;							\
+ 	done 2>&1 < $< > $@
+@@ -207,11 +207,11 @@ doc/quilt.1: doc/quilt.1.in $(QUILT:%=qu
+ 	  '@REFERENCE''@')						\
+ 	    $(MAKE) -s reference |					\
+ 	    $(SED) -e 's/^quilt \([^ ]*\)\(.*\)/.IP "\\fB\1\\fP\2 " 4/'	\
+-		   -e $$'s/^  \\(-[^\t]*\\)\t\\?/.IP "    \\1" 8\\\n/'	\
+-		   -e $$'s/^  \t\\?//'					\
++		   -e 's/^  \(-[^\t]*\)\t\?/.IP "    \1" 8\n/'	        \
++		   -e 's/^  \t\?//'					\
+ 	    ;;								\
+ 	  *)								\
+-	    echo "$$line"						\
++	    printf "%s\n" "$$line"					\
+ 	    ;;								\
+ 	  esac;								\
+ 	done < $< 2>&1 > $@
+  * Make backup-files a shell script instead of a binary, so we can make
+    quilt arch: all [Steve Langasek, thanks so much]
+    (Closes: #363659)
+    
+Upstream status: Submitted 060427
+
+---
+ Makefile.in                   |   26 -
+ bin/quilt.in                  |    4 
+ lib/backup-files.c            |  601 ------------------------------------------
+ quilt/add.in                  |    2 
+ quilt/pop.in                  |    6 
+ quilt/push.in                 |    2 
+ quilt/scripts/backup-files.in |  291 ++++++++++++++++++++
+ quilt/scripts/patchfns.in     |    2 
+ quilt/snapshot.in             |    2 
+ 9 files changed, 306 insertions(+), 630 deletions(-)
+
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -6,7 +6,6 @@
+ prefix :=	@prefix@
+ exec_prefix :=	@exec_prefix@
+ bindir :=	@bindir@
+-libdir :=	@libdir@
+ datarootdir :=	@datarootdir@
+ datadir :=	@datadir@
+ docdir :=	@docdir@
+@@ -51,11 +50,6 @@
+ LIBS :=		@LIBS@
+ EXEEXT :=	@EXEEXT@
+ 
+-LIBOBJS :=	$(filter $(patsubst lib/%.c,lib/%.o,$(wildcard lib/*.c)), $(patsubst %,lib/%,@LIBOBJS@))
+-ifneq ($(LIBOBJS),)
+-CFLAGS += -Ilib
+-endif
+-
+ COMPAT_SYMLINKS	:= @COMPAT_SYMLINKS@
+ COMPAT_PROGRAMS	:= @COMPAT_PROGRAMS@
+ 
+@@ -83,7 +77,7 @@
+ DIRT +=		$(QUILT_IN:%=quilt/%)
+ 
+ SCRIPTS_IN :=	patchfns parse-patch inspect dependency-graph edmail	\
+-		remove-trailing-ws
++		remove-trailing-ws backup-files
+ 
+ SCRIPTS_SRC :=	$(SCRIPTS_IN:%=%.in)
+ SCRIPTS :=	$(SCRIPTS_IN)
+@@ -131,16 +125,13 @@
+ # Settings for running the uninstalled version of quilt in the source tree:
+ PATH :=		$(CURDIR)/bin:$(CURDIR)/compat:$(PATH)
+ QUILT_DIR :=	$(CURDIR)/quilt
+-QUILT_LIB :=	$(CURDIR)/lib
+ QUILTRC :=	$(CURDIR)/test/test.quiltrc
+-export QUILT_DIR QUILT_LIB QUILTRC
++export QUILT_DIR QUILTRC
+ 
+ #-----------------------------------------------------------------------
+ 
+ all : configure scripts compat $(DOC:%=doc/%) $(MAN1) mofiles
+ 
+-$(LIB:%=lib/%) :: $(LIBOBJS)
+-
+ ifeq ($(USE_NLS),yes)
+ mofiles : $(LINGUAS:%=po/%.mo)
+ else
+@@ -154,7 +145,7 @@
+ 	$(MSGMERGE) -o $@ $@ $^
+ 
+ scripts : $(BIN:%=bin/%) $(QUILT:%=quilt/%) 				\
+-	  $(SCRIPTS:%=quilt/scripts/%) $(LIB:%=lib/%)			\
++	  $(SCRIPTS:%=quilt/scripts/%) 					\
+ 	  $(if $(PATCH_WRAPPER),bin/patch-wrapper)
+ 
+ dist : clean $(PACKAGE)-$(VERSION).tar.gz
+@@ -258,8 +249,7 @@
+ $(patsubst %.in,%,$(wildcard bin/*.in quilt/*.in quilt/scripts/*.in)) :: Makefile
+ % :: %.in
+ 	@echo "$< -> $@" >&2
+-	@$(SED) -e 's:@QUILT_LIB''@:$(libdir)/$(PACKAGE):g'		\
+-		-e 's:@QUILT_DIR''@:$(datadir)/$(PACKAGE):g'		\
++	@$(SED) -e 's:@QUILT_DIR''@:$(datadir)/$(PACKAGE):g'		\
+ 		-e 's:@PERL''@:$(PERL):g'				\
+ 		-e 's:@BASH''@:$(BASH):g'				\
+ 		-e 's:@PATCH''@:$(PATCH):g'				\
+@@ -270,7 +260,7 @@
+ 		$< > $@
+ 	@$(if $(filter-out $<,$(NON_EXEC_IN)),chmod +x $@)
+ 
+-lib/backup-files.o :: Makefile
++#lib/backup-files.o :: Makefile
+ 
+ configure : configure.ac aclocal.m4
+ 	autoconf
+@@ -322,9 +312,6 @@
+ 		   $(BUILD_ROOT)$(datadir)/$(PACKAGE)/wrapper/patch
+ endif
+ 	
+-	$(INSTALL) -d $(BUILD_ROOT)$(libdir)/$(PACKAGE)
+-	$(INSTALL) -m 755 $(LIB:%=lib/%) $(BUILD_ROOT)$(libdir)/$(PACKAGE)/
+-
+ 	$(INSTALL) -d $(BUILD_ROOT)$(docdir)/$(PACKAGE)-$(VERSION)/
+ 	$(INSTALL) -m 644 doc/README					\
+ 		   $(BUILD_ROOT)$(docdir)/$(PACKAGE)-$(VERSION)/
+@@ -361,7 +348,6 @@
+ 
+ uninstall ::
+ 	rm -rf $(BIN:%=$(BUILD_ROOT)$(bindir)/%)			\
+-	       $(BUILD_ROOT)$(libdir)/$(PACKAGE)			\
+ 	       $(BUILD_ROOT)$(datadir)/$(PACKAGE)			\
+ 	       $(patsubst %,$(BUILD_ROOT)$(mandir)/man1/%,		\
+ 		   $(notdir $(MAN1)))					\
+@@ -385,7 +371,7 @@
+ 
+ # Include a run-time generated list of dependencies for each test case
+ test/.depend : Makefile $(TESTS)
+-	@(  printf "%s : bin/quilt quilt/scripts/patchfns $(LIB:%=lib/%) $(COMPAT)\n" $(TESTS); \
++	@(  printf "%s : bin/quilt quilt/scripts/patchfns $(COMPAT)\n" $(TESTS); \
+ 	    $(AWK) 'sub(/.*\$$ *quilt /, "")				\
+ 			{ print FILENAME, ":", "quilt/"$$1}' $(TESTS); \
+ 	    $(AWK) 'sub(/.*\<quilt_command /, "") && ($$1 !~ /[^a-z]/)	\
+Index: b/quilt/add.in
+===================================================================
+--- a/quilt/add.in
++++ b/quilt/add.in
+@@ -121,7 +121,7 @@
+ 		continue
+ 	fi
+ 
+-	if ! $QUILT_LIB/backup-files -b -s -L -B $QUILT_PC/$patch/ $SUBDIR$file
++	if ! $QUILT_DIR/scripts/backup-files -b -s -L -B $QUILT_PC/$patch/ $SUBDIR$file
+ 	then
+ 		printf $"Failed to back up file %s\n" "$SUBDIR$file" >&2
+ 		status=1
+Index: b/quilt/pop.in
+===================================================================
+--- a/quilt/pop.in
++++ b/quilt/pop.in
+@@ -95,7 +95,7 @@
+ 		local prefix=$QUILT_PC/$patch/
+ 		[ ${prefix:0:1} == / ] || prefix=$PWD/$prefix
+ 		if ! ( cd $workdir && \
+-		       $QUILT_LIB/backup-files -B $prefix -rks - )
++		       $QUILT_DIR/scripts/backup-files -B $prefix -r -k -s - )
+ 		then
+ 			printf $"Failed to copy files to temporary directory\n" >&2
+ 			rm -rf $workdir
+@@ -162,7 +162,7 @@
+ 			status=$?
+ 		else
+ 			printf $"Removing patch %s\n" "$(print_patch $patch)"
+-			$QUILT_LIB/backup-files $silent -r -t -B $QUILT_PC/$patch/ -
++			$QUILT_DIR/scripts/backup-files $silent -r -t -B $QUILT_PC/$patch/ -
+ 			status=$?
+ 		fi
+ 		remove_from_db $patch
+@@ -264,7 +264,7 @@
+ 	# of one: This will automatically be the case in the usual
+ 	# situations, but we don't want to risk file corruption in weird
+ 	# corner cases such as files added to a patch but not modified.
+-	$QUILT_LIB/backup-files -L -s -B $QUILT_PC/$patch/ -
++	$QUILT_DIR/scripts/backup-files -L -s -B $QUILT_PC/$patch/ -
+ 	printf $"Now at patch %s\n" "$(print_patch $patch)"
+ fi
+ ### Local Variables:
+Index: b/quilt/push.in
+===================================================================
+--- a/quilt/push.in
++++ b/quilt/push.in
+@@ -135,7 +135,7 @@
+ {
+ 	local patch=$1
+ 
+-	$QUILT_LIB/backup-files $silent_unless_verbose -r -B $QUILT_PC/$patch/ -
++	$QUILT_DIR/scripts/backup-files $silent_unless_verbose -r -B $QUILT_PC/$patch/ -
+ }
+ 
+ cleanup_patch_output() {
+Index: b/quilt/snapshot.in
+===================================================================
+--- a/quilt/snapshot.in
++++ b/quilt/snapshot.in
+@@ -85,7 +85,7 @@
+ 	}
+ 	{ print }
+ ' \
+-| $QUILT_LIB/backup-files -b -s -L -f - -B "$QUILT_PC/$snap_subdir/"
++| $QUILT_DIR/scripts/backup-files -b -s -L -f - -B "$QUILT_PC/$snap_subdir/"
+ 
+ ### Local Variables:
+ ### mode: shell-script
+Index: b/quilt/scripts/backup-files.in
+===================================================================
+--- /dev/null
++++ b/quilt/scripts/backup-files.in
+@@ -0,0 +1,291 @@
++#! @BASH@
++
++set -e
++
++# File: backup-files.sh
++
++# Copyright (C) 2006 Steve Langasek <vorlon@debian.org>
++# portions Copyright (C) 2003, 2004, 2005, 2006 Andreas Gruenbacher
++# <agruen@suse.de>, SuSE Labs
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; version 2 dated June, 1991.
++
++# This program is distributed in the hope that it will be useful, but
++# WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++# General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program;  if not, write to the Free Software
++# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++# MA 02110-1301, USA.
++
++
++# Create backup files of a list of files similar to GNU patch. A path
++# name prefix and suffix for the backup file can be specified with the
++# -B and -z options.
++
++usage () {
++	progname="$1"
++	printf "Usage: %s [-B prefix] [-z suffix] [-f {file|-}] [-s] [-k] [-t] [-L] [-b|-r|-x] {file|-} ...\n"\
++	"\n"\
++	"\tCreate hard linked backup copies of a list of files\n"\
++	"\tread from standard input.\n"\
++	"\n"\
++	"\t-b\tCreate backup\n"\
++	"\t-r\tRestore the backup\n"\
++	"\t-x\tRemove backup files and empty parent directories\n"\
++	"\t-k\tWhen doing a restore, keep the backup files\n"\
++	"\t-B\tPath name prefix for backup files\n"\
++	"\t-z\tPath name suffix for backup files\n"\
++	"\t-s\tSilent operation; only print error messages\n"\
++	"\t-f\tRead the filenames to process from file (- = standard input)\n"\
++	"\t-t\tTouch original files after restore (update their mtimes)\n\n"\
++	"\t-L\tEnsure that when finished, the source file has a link count of 1\n\n", \
++	"$progname"
++}
++
++copy_file() {
++	from="$1"
++	to="$2"
++	cp -dp --remove-destination "$from" "$to"
++}
++
++link_or_copy_file() {
++	from="$1"
++	to="$2"
++	if ! ln "$from" "$to" 2>/dev/null || [ -d "$to" ]; then
++		copy_file "$from" "$to"
++	fi
++}
++
++ensure_nolinks() {
++	filename="$1"
++
++	link_count=$(stat -c '%h' "$filename")
++	if [ -z "$link_count" ] || [ "$link_count" -gt 1 ]; then
++		dirname=$(dirname "$filename")
++		basename=$(basename "$filename")
++		# Temp file name is "path/to/.file.XXXXXX"
++		tmpname=$(mktemp "${dirname}/.${basename}.XXXXXX")
++		cp -dp "$filename" "$tmpname"
++		mv "$tmpname" "$filename"
++	fi
++}
++
++process_file() {
++	file="$1"
++	backup="${OPT_PREFIX}${file}${OPT_SUFFIX}"
++
++	if [ "$OPT_WHAT" == "backup" ]; then
++		if [ -e "$backup" ]; then
++			rm "$backup"
++		else
++			mkdir -p "$(dirname "$backup")"
++		fi
++		if [ ! -e "$file" ]; then
++			$ECHO "New file $file"
++			touch "$backup"
++		else
++			$ECHO "Copying $file"
++			if [ -n "$OPT_NOLINKS" -a "$(stat -c '%h' "$file")" = "1" ]; then
++				copy_file "$file" "$backup"
++			else
++				link_or_copy_file "$file" "$backup"
++				if [ -n "$OPT_NOLINKS" ]; then
++					ensure_nolinks "$file"
++				fi
++			fi
++			if [ -n "OPT_TOUCH" ]; then
++				touch "$backup"
++			fi
++		fi
++	elif [ "$OPT_WHAT" == "restore" ]; then
++		mkdir -p "$(dirname "$file")"
++
++		if [ ! -e "$backup" ]; then
++			return 1
++		fi
++		if [ ! -s "$backup" ]; then
++			if [ -e "$file" ]; then
++				rm "$file"
++			fi
++			$ECHO "Removing $file"
++			if [ -z "$OPT_KEEP_BACKUP" ]; then
++				rm "$backup"
++				while [ -d "${backup%/*}" ] && ! [ -L "${backup%/*}" ]
++				do
++					backup="${backup%/*}"
++					rmdir --ignore-fail-on-non-empty "$backup" 2>/dev/null
++					if [ -d "$backup" ]; then
++						break
++					fi
++				done
++			fi
++		else
++			$ECHO "Restoring $file"
++			if [ -e "$file" ]; then
++				rm "$file"
++			fi
++			if [ -n "$OPT_NOLINKS" -a "$(stat -c '%h' "$backup")" != "1" ]; then
++				copy_file "$backup" "$file"
++			else
++                        	link_or_copy_file "$backup" "$file"
++				if [ -n "$OPT_NOLINKS" ]; then
++					ensure_nolinks "$file"
++				fi
++			fi
++
++			if [ -z "$OPT_KEEP_BACKUP" ]; then
++				rm "$backup"
++				while [ -d "${backup%/*}" ] && ! [ -L "${backup%/*}" ]
++				do
++					backup="${backup%/*}"
++					rmdir --ignore-fail-on-non-empty "$backup" 2>/dev/null
++					if [ -d "$backup" ]; then
++						break
++					fi
++				done
++			fi
++			if [ -n "$OPT_TOUCH" ]; then
++				touch "$file"
++			fi
++		fi
++	elif [ "$OPT_WHAT" == "remove" ]; then
++		if [ -e "$backup" ]; then
++			rm "$backup"
++		fi
++		while [ -d "${backup%/*}" ] && ! [ -L "${backup%/*}" ]
++		do
++			backup="${backup%/*}"
++			rmdir --ignore-fail-on-non-empty "$backup" 2>/dev/null
++			if [ -d "$backup" ]; then
++				break
++			fi
++		done
++	elif [ "$OPT_WHAT" == "noop" ]; then
++		if [ -e "$file" ] && [ -n "$OPT_NOLINKS" ]; then
++			ensure_nolinks "$file"
++		fi
++	else
++		return 1
++	fi
++}
++
++walk() {
++	path="$1"
++	if [ ! -f "$path" ]; then
++		return 0
++	fi
++
++	if [ "${path#$OPT_PREFIX}" == "$path" ]
++	then
++		# prefix does not match
++		return 0
++	fi
++	path="${path#$OPT_PREFIX}"
++
++	if [ -n "$OPT_SUFFIX" ] && [ "${path%$OPT_SUFFIX}" == "$path" ]
++	then
++		# suffix does not match
++		return 0
++	fi
++	path="${path%$OPT_SUFFIX}"
++
++	process_file "$path"
++}
++
++
++ECHO=echo
++declare -a FILELIST
++progname="$0"
++while [ $# -gt 0 ]; do
++	case $1 in
++	-b)	OPT_WHAT=backup
++		;;
++	-r)	OPT_WHAT=restore
++		;;
++	-x)	OPT_WHAT=remove
++		;;
++	-B)	OPT_PREFIX=$2
++		shift
++		;;
++	-f)	OPT_FILE=$2
++		shift
++		;;
++	-z)	OPT_SUFFIX=$2
++		shift
++		;;
++	-s)	ECHO=:
++		;;
++	-k)	OPT_KEEP_BACKUP=1
++		;;
++	-L)	OPT_NOLINKS=1
++		;;
++	-t)	OPT_TOUCH=1
++		;;
++	-?*)	usage "$progname"
++		exit 0
++		;;
++	*)	FILELIST=($@)
++		break
++		;;
++	esac
++
++        shift
++done
++
++if [ -z "${OPT_PREFIX}${OPT_SUFFIX}" ]; then
++	usage "$progname"
++	exit 1
++fi
++if [ ${#FILELIST[@]} == 0 ] && [ -z "$OPT_FILE" ]; then
++	usage "$progname"
++	exit 1
++fi
++
++if [ -n "$OPT_FILE" ]; then
++	cat "$OPT_FILE" \
++	| while read nextfile; do
++		process_file "$nextfile"
++	done
++fi
++
++I=0
++while [ $I -lt ${#FILELIST[@]} ]; do
++
++	case "${FILELIST[$I]}" in
++	-)
++		path="${OPT_PREFIX%/*}"
++		if ! [ -n "$path" ] && [ -d "$path" ] ; then
++			I=$(($I+1))
++			continue
++		fi
++
++		find "$path" -mindepth 1 \( -type f -o -type d \) -print 2>/dev/null \
++		| while read
++		do
++			if [ -d "$REPLY" ]
++			then
++				if ! [ -r "$REPLY" ] || ! [ -x "$REPLY" ]
++				then
++					echo "$REPLY: Permission denied"
++					exit 1
++				fi
++			else
++				walk "$REPLY"
++			fi
++		done
++		if [ $? != 0 ]; then
++			exit 1
++		fi
++		;;
++	*)
++		process_file "${FILELIST[$I]}"
++		;;
++	esac
++
++	I=$(($I+1))
++done
+Index: b/bin/quilt.in
+===================================================================
+--- a/bin/quilt.in
++++ b/bin/quilt.in
+@@ -9,8 +9,8 @@
+ export TEXTDOMAIN=quilt
+ export TEXTDOMAINDIR=@LOCALEDIR@
+ 
+-: ${QUILT_DIR=@QUILT_DIR@} ${QUILT_LIB=@QUILT_LIB@}
+-export QUILT_DIR QUILT_LIB
++: ${QUILT_DIR=@QUILT_DIR@}
++export QUILT_DIR
+ 
+ if [ -z "$QUILTRC" ]
+ then
+Index: b/lib/backup-files.c
+===================================================================
+--- a/lib/backup-files.c
++++ /dev/null
+@@ -1,601 +0,0 @@
+-/*
+-  File: backup-files.c
+-
+-  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008
+-  Andreas Gruenbacher <agruen@suse.de>, SuSE Labs
+-
+-  This program is free software; you can redistribute it and/or
+-  modify it under the terms of the GNU Library General Public
+-  License as published by the Free Software Foundation; either
+-  version 2 of the License, or (at your option) any later version.
+-
+-  This program is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-  Library General Public License for more details.
+-
+-  You should have received a copy of the GNU Library General Public
+-  License along with this library; if not, write to the Free Software
+-  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+-*/
+-
+-/*
+- * Create backup files of a list of files similar to GNU patch. A path
+- * name prefix and suffix for the backup file can be specified with the
+- * -B and -z options.
+- */
+-
+-#define _GNU_SOURCE 1
+-
+-#ifdef HAVE_CONFIG_H
+-# include "config.h"
+-#endif
+-
+-#include <sys/types.h>
+-#include <sys/stat.h>
+-#include <utime.h>
+-#include <fcntl.h>
+-#include <unistd.h>
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <errno.h>
+-#include <string.h>
+-#include <dirent.h>
+-
+-#if !defined(HAVE_MKSTEMP) && defined(HAVE_MKTEMP)
+-# define mkstemp(x) creat(mktemp(x), 0600)
+-#endif
+-
+-#ifndef PATH_MAX
+-# define PATH_MAX 4096
+-#endif
+-
+-#ifdef __MINGW32__
+-#define mkdir(x,y) mkdir(x)
+-/* Symlinks are not supported */
+-#define lstat stat
+-static int link(const char *oldpath, const char *newpath)
+-{
+-	errno = ENOSYS;
+-	return -1;
+-}
+-#endif
+-
+-const char *progname;
+-
+-enum { what_noop, what_backup, what_restore, what_remove };
+-
+-const char *opt_prefix="", *opt_suffix="", *opt_file;
+-int opt_silent, opt_what=what_noop;
+-int opt_nolinks, opt_touch;
+-int opt_keep_backup;
+-
+-#define LINE_LENGTH 1024
+-
+-
+-static void
+-usage(void)
+-{
+-	printf("Usage: %s [-B prefix] [-z suffix] [-f {file|-}] [-sktL] [-b|-r|-x] {file|-} ...\n"
+-	       "\n"
+-	       "\tCreate hard linked backup copies of a list of files\n"
+-	       "\tread from standard input.\n"
+-	       "\n"
+-	       "\t-b\tCreate backup\n"
+-	       "\t-r\tRestore the backup\n"
+-	       "\t-x\tRemove backup files and empty parent directories\n"
+-	       "\t-k\tWhen doing a restore, keep the backup files\n"
+-	       "\t-B\tPath name prefix for backup files\n"
+-	       "\t-z\tPath name suffix for backup files\n"
+-	       "\t-s\tSilent operation; only print error messages\n"
+-	       "\t-f\tRead the filenames to process from file (- = standard input)\n"
+-	       "\t-t\tTouch original files after restore (update their mtimes)\n\n"
+-	       "\t-L\tEnsure that when finished, the source file has a link count of 1\n\n",
+-	       progname);
+-}
+-
+-static void *
+-malloc_nofail(size_t size)
+-{
+-	void *p = malloc(size);
+-	if (!p) {
+-		perror(progname);
+-		exit(1);
+-	}
+-	return p;
+-}
+-
+-static void
+-create_parents(const char *filename)
+-{
+-	struct stat st;
+-	int rv = -1;
+-	char *fn = malloc_nofail(strlen(filename) + 1), *f;
+-
+-	strcpy(fn, filename);
+-
+-	f = strrchr(fn, '/');
+-	if (f == NULL)
+-		goto out;
+-	*f = '\0';
+-	if (stat(fn, &st) == 0)
+-		goto out;
+-	*f = '/';
+-
+-	f = strchr(fn, '/');
+-	while (f != NULL) {
+-		*f = '\0';
+-		if (!rv || (rv = stat(fn, &st)) != 0) {
+-			mkdir(fn, 0777);
+-		}
+-		*f = '/';
+-		f = strchr(f+1, '/');
+-	}
+-out:
+-	free(fn);
+-}
+-
+-static void
+-remove_parents(const char *filename)
+-{
+-	char *fn = malloc_nofail(strlen(filename) + 1), *f;
+-
+-	strcpy(fn, filename);
+-
+-	f = strrchr(fn, '/');
+-	if (f == NULL)
+-		goto out;
+-	do {
+-		*f = '\0';
+-		if (rmdir(fn) == -1)
+-			goto out;
+-	} while ((f = strrchr(fn, '/')) != NULL);
+-	rmdir(fn);
+-out:
+-	free(fn);
+-}
+-
+-static int
+-copy_fd(int from_fd, int to_fd)
+-{
+-	char buffer[16384];
+-	char *wbuf;
+-	ssize_t len, l;
+-
+-	for ( ;; ) {
+-		len = read(from_fd, buffer, sizeof(buffer));
+-		if (len == 0)
+-			return 0;
+-		if (len < 0) {
+-			if (errno == EINTR || errno == EAGAIN)
+-				continue;
+-			return 1;
+-		}
+-		for (wbuf = buffer; len != 0; ) {
+-			l = write(to_fd, wbuf, len);
+-			if (l < 0) {
+-				if (errno == EINTR || errno == EAGAIN)
+-					continue;
+-				return 1;
+-			}
+-			wbuf += l;
+-			len -= l;
+-		}
+-	}
+-}
+-
+-static int
+-copy_file(const char *from, const struct stat *st, const char *to)
+-{
+-	int from_fd, to_fd, error = 1;
+-
+-	if ((from_fd = open(from, O_RDONLY)) == -1) {
+-		perror(from);
+-		return 1;
+-	}
+-	unlink(to);  /* make sure we don't inherit this file's mode. */
+-	if ((to_fd = creat(to, st->st_mode)) < 0) {
+-		perror(to);
+-		close(from_fd);
+-		return 1;
+-	}
+-#if defined(HAVE_FCHMOD)
+-	(void) fchmod(to_fd, st->st_mode);
+-#elif defined(HAVE_CHMOD)
+-	(void) chmod(to, st->st_mode);
+-#endif
+-	if (copy_fd(from_fd, to_fd)) {
+-		fprintf(stderr, "%s -> %s: %s\n", from, to, strerror(errno));
+-		unlink(to);
+-		goto out;
+-	}
+-
+-	error = 0;
+-out:
+-	close(from_fd);
+-	close(to_fd);
+-
+-	return error;
+-}
+-
+-static int
+-link_or_copy_file(const char *from, const struct stat *st, const char *to)
+-{
+-	if (link(from, to) == 0)
+-		return 0;
+-	if (errno != EXDEV && errno != EPERM &&
+-	    errno != EMLINK && errno != ENOSYS) {
+-		fprintf(stderr, "Could not link file `%s' to `%s': %s\n",
+-		       from, to, strerror(errno));
+-		return 1;
+-	}
+-	return copy_file(from, st, to);
+-}
+-
+-static int
+-ensure_nolinks(const char *filename)
+-{
+-	struct stat st;
+-
+-	if (stat(filename, &st) != 0) {
+-		perror(filename);
+-		return 1;
+-	}
+-	if (st.st_nlink > 1) {
+-		char *tmpname = malloc(1 + strlen(filename) + 7 + 1), *c;
+-		int from_fd = -1, to_fd = -1;
+-		int error = 1;
+-
+-		if (!tmpname)
+-			goto fail;
+-		from_fd = open(filename, O_RDONLY);
+-		if (from_fd == -1)
+-			goto fail;
+-
+-		/* Temp file name is "path/to/.file.XXXXXX" */
+-		strcpy(tmpname, filename);
+-		strcat(tmpname, ".XXXXXX");
+-		c = strrchr(tmpname, '/');
+-		if (c == NULL)
+-			c = tmpname;
+-		else
+-			c++;
+-		memmove(c + 1, c, strlen(c) + 1);
+-		*c = '.';
+-
+-		to_fd = mkstemp(tmpname);
+-		if (to_fd == -1)
+-			goto fail;
+-		if (copy_fd(from_fd, to_fd))
+-			goto fail;
+-#if defined(HAVE_FCHMOD)
+-		(void) fchmod(to_fd, st.st_mode);
+-#elif defined(HAVE_CHMOD)
+-		(void) chmod(tmpname, st.st_mode);
+-#endif
+-		close(from_fd);
+-		from_fd = -1;
+-		close(to_fd);
+-		to_fd = -1;
+-		if (rename(tmpname, filename))
+-			goto fail;
+-
+-		error = 0;
+-	fail:
+-		if (error)
+-			perror(filename);
+-		if (from_fd != -1)
+-			close(from_fd);
+-		if (to_fd != -1)
+-			close(to_fd);
+-		free(tmpname);
+-		return error;
+-	} else
+-		return 0;
+-}
+-
+-static int
+-process_file(const char *file)
+-{
+-	char *backup = malloc_nofail(
+-		strlen(opt_prefix) + strlen(file) + strlen(opt_suffix) + 1);
+-
+-	sprintf(backup, "%s%s%s", opt_prefix, file, opt_suffix);
+-
+-	if (opt_what == what_backup) {
+-		struct stat st;
+-		int missing_file = (stat(file, &st) == -1 && errno == ENOENT);
+-
+-		unlink(backup);
+-		create_parents(backup);
+-		if (missing_file) {
+-			int fd;
+-
+-			if (!opt_silent)
+-				printf("New file %s\n", file);
+-			/* GNU patch creates new files with mode==0. */
+-			if ((fd = creat(backup, 0)) == -1) {
+-				perror(backup);
+-				goto fail;
+-			}
+-			close(fd);
+-		} else {
+-			if (!opt_silent)
+-				printf("Copying %s\n", file);
+-			if (opt_nolinks && st.st_nlink == 1) {
+-				if (copy_file(file, &st, backup))
+-					goto fail;
+-			} else {
+-				if (link_or_copy_file(file, &st, backup))
+-					goto fail;
+-				if (opt_nolinks && ensure_nolinks(file))
+-					goto fail;
+-			}
+-			if (opt_touch)
+-				(void) utime(backup, NULL);
+-			else {
+-				struct utimbuf ut;
+-				ut.actime = ut.modtime = st.st_mtime;
+-				(void) utime(backup, &ut);
+-			}
+-		}
+-	} else if (opt_what == what_restore) {
+-		struct stat st;
+-
+-		create_parents(file);
+-		if (stat(backup, &st) != 0) {
+-			perror(backup);
+-			goto fail;
+-		}
+-		if (st.st_size == 0) {
+-			if (unlink(file) == 0 || errno == ENOENT) {
+-				if (!opt_silent)
+-					printf("Removing %s\n", file);
+-			} else {
+-				perror(file);
+-				goto fail;
+-			}
+-			if (!opt_keep_backup) {
+-				unlink(backup);
+-				remove_parents(backup);
+-			}
+-		} else {
+-			if (!opt_silent)
+-				printf("Restoring %s\n", file);
+-			unlink(file);
+-			if (opt_nolinks && st.st_nlink != 1) {
+-				if (copy_file(backup, &st, file))
+-					goto fail;
+-			} else {
+-				if (link_or_copy_file(backup, &st, file))
+-					goto fail;
+-				if (opt_nolinks && ensure_nolinks(file))
+-					goto fail;
+-			}
+-			if (!opt_keep_backup) {
+-				unlink(backup);
+-				remove_parents(backup);
+-			}
+-			if (opt_touch)
+-				(void) utime(file, NULL);
+-			else {
+-				struct utimbuf ut;
+-				ut.actime = ut.modtime = st.st_mtime;
+-				(void) utime(file, &ut);
+-			}
+-		}
+-	} else if (opt_what == what_remove) {
+-		unlink(backup);
+-		remove_parents(backup);
+-	} else if (opt_what == what_noop) {
+-		struct stat st;
+-		int missing_file = (stat(file, &st) == -1 && errno == ENOENT);
+-
+-		if (!missing_file && opt_nolinks) {
+-			if (ensure_nolinks(file))
+-				goto fail;
+-		}
+-	} else
+-		goto fail;
+-
+-	free(backup);
+-	return 0;
+-
+-fail:
+-	free(backup);
+-	return 1;
+-}
+-
+-static int
+-foreachdir_rec(const char *path, struct stat *st,
+-	       int (*walk)(const char *, const struct stat *))
+-{
+-	DIR *dir;
+-	struct dirent *dp;
+-	int failed = 0;
+-	char *p = malloc_nofail(PATH_MAX);
+-
+-	if (access(path, R_OK|X_OK) || !(dir = opendir(path)))
+-		return walk(path, NULL);
+-	while ((dp = readdir(dir))) {
+-		if (!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, ".."))
+-			continue;
+-		if (strlen(path) + 1 + strlen(dp->d_name) + 1 > PATH_MAX) {
+-			fprintf(stderr, "%s/%s: name too long\n", path,
+-				dp->d_name);
+-			failed = -1;
+-			goto out;
+-		}
+-		sprintf(p, "%s/%s", path, dp->d_name);
+-		
+-		if (lstat(p, st))
+-			continue;  /* file has disappeared meanwhile */
+-		if (S_ISDIR(st->st_mode)) {
+-			failed = foreachdir_rec(p, st, walk);
+-			if (failed)
+-				goto out;
+-		} else {
+-			failed = walk(p, st);
+-			if (failed)
+-				goto out;
+-		}
+-	}
+-	if (closedir(dir) != 0)
+-		failed = -1;
+-
+-out:
+-	free(p);
+-	return failed;
+-}
+-
+-static int
+-foreachdir(const char *path,
+-	   int (*walk)(const char *, const struct stat *))
+-{
+-	struct stat st;
+-
+-	if (lstat(path, &st))
+-		return walk(path, NULL);
+-	return foreachdir_rec(path, &st, walk);
+-}
+-
+-static int
+-walk(const char *path, const struct stat *st)
+-{
+-	size_t prefix_len=strlen(opt_prefix), suffix_len=strlen(opt_suffix);
+-	size_t len = strlen(path);
+-	char *p;
+-	int ret;
+-
+-	if (!st) {
+-		perror(path);
+-		return 1;
+-	}
+-	if (!S_ISREG(st->st_mode))
+-		return 0;
+-	if (strncmp(opt_prefix, path, prefix_len))
+-		return 0;  /* prefix does not match */
+-	if (len < suffix_len || strcmp(opt_suffix, path + len - suffix_len))
+-		return 0;  /* suffix does not match */
+-
+-	p = malloc_nofail(len - prefix_len - suffix_len + 1);
+-	memcpy(p, path + prefix_len, len - prefix_len - suffix_len);
+-	p[len - prefix_len - suffix_len] = '\0';
+-	ret = process_file(p);
+-	free(p);
+-	return ret;
+-}
+-
+-int
+-main(int argc, char *argv[])
+-{
+-	int opt, status = 0;
+-
+-	progname = argv[0];
+-
+-	while ((opt = getopt(argc, argv, "brkxB:z:f:shLt")) != -1) {
+-		switch(opt) {
+-			case 'b':
+-				opt_what = what_backup;
+-				break;
+-
+-			case 'r':
+-				opt_what = what_restore;
+-				break;
+-
+-			case 'k':
+-				opt_keep_backup = 1;
+-				break;
+-
+-			case 'x':
+-				opt_what = what_remove;
+-				break;
+-
+-			case 'B':
+-				opt_prefix = optarg;
+-				break;
+-
+-			case 'f':
+-				opt_file = optarg;
+-				break;
+-
+-			case 'z':
+-				opt_suffix = optarg;
+-				break;
+-
+-			case 's':
+-				opt_silent = 1;
+-				break;
+-
+-			case 'L':
+-				opt_nolinks = 1;
+-				break;
+-
+-			case 't':
+-				opt_touch = 1;
+-				break;
+-
+-			case 'h':
+-			default:
+-				usage();
+-				return 0;
+-		}
+-	}
+-
+-	if ((*opt_prefix == '\0' && *opt_suffix == '\0') ||
+-	    (opt_file == NULL && optind == argc)) {
+-		usage();
+-		return 1;
+-	}
+-
+-	if (opt_file != NULL) {
+-		FILE *file;
+-		char line[LINE_LENGTH];
+-
+-		if (!strcmp(opt_file, "-")) {
+-			file = stdin;
+-		} else {
+-			if ((file = fopen(opt_file, "r")) == NULL) {
+-				perror(opt_file);
+-				return 1;
+-			}
+-		}
+-
+-		while (fgets(line, sizeof(line), file)) {
+-			char *l = strchr(line, '\0');
+-
+-			if (l > line && *(l-1) == '\n')
+-				*(l-1) = '\0';
+-			if (*line == '\0')
+-				continue;
+-
+-			if ((status = process_file(line)) != 0)
+-				return status;
+-		}
+-
+-		if (file != stdin) {
+-			fclose(file);
+-		}
+-	}
+-	for (; optind < argc; optind++) {
+-		if (strcmp(argv[optind], "-") == 0) {
+-			struct stat st;
+-			char *dir = strdup(opt_prefix), *d = strrchr(dir, '/');
+-			if (d)
+-				*d = '\0';
+-			else
+-				d = ".";
+-			if (stat(dir, &st) == 0) {
+-				status = foreachdir(dir, walk);
+-				if (status == -1)
+-					perror(dir);
+-			}
+-			free(dir);
+-		} else
+-			status = process_file(argv[optind]);
+-		if (status)
+-			return status;
+-	}
+-
+-	return status;
+-}
+Index: b/quilt/scripts/patchfns.in
+===================================================================
+--- a/quilt/scripts/patchfns.in
++++ b/quilt/scripts/patchfns.in
+@@ -884,7 +884,7 @@
+ 	local prefix=$QUILT_PC/$patch/
+ 	[ ${prefix:0:1} == / ] || prefix=$PWD/$prefix
+ 	if ! ( cd $workdir && \
+-	       $QUILT_LIB/backup-files -B $prefix -rks ${@:--} )
++	       $QUILT_DIR/scripts/backup-files -B $prefix -r -k -s ${@:--} )
+ 	then
+ 		printf $"Failed to copy files to temporary directory\n" >&2
+ 		return 1
+Change some little glitches to fit better the Debian conventions.
+
+Upstream status: not applicable
+
+---
+ Makefile.in    |    2 +-
+ doc/quilt.1.in |    3 +--
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -256,7 +256,7 @@
+ 		-e 's:@VERSION''@:$(VERSION):g'				\
+ 		-e 's:@RELEASE''@:$(RELEASE):g'				\
+ 		-e 's:@LOCALEDIR''@:$(localedir):g'			\
+-		-e 's:@DOCSUBDIR''@:$(docdir)/$(PACKAGE)-$(VERSION):g'	\
++		-e 's:@DOCSUBDIR''@:$(docdir)/$(PACKAGE):g'		\
+ 		$< > $@
+ 	@$(if $(filter-out $<,$(NON_EXEC_IN)),chmod +x $@)
+ 
+Index: b/doc/quilt.1.in
+===================================================================
+--- a/doc/quilt.1.in
++++ b/doc/quilt.1.in
+@@ -217,8 +217,7 @@
+ 
+ .SH SEE ALSO
+ 
+-The pdf documentation, which should be under /usr/share/doc/quilt/quilt.pdf.
+-Note that some distributors compress this file. 
++The pdf documentation, under /usr/share/doc/quilt/quilt.pdf.gz
+ .BR zxpdf ( 1 )
+ can be used to display compressed pdf files.
+ 
+  * Make sure that quilt fails when trying to push a non existant patch (ie
+    if there is a typo in the serie file) unless -f is provided.
+    (Closes: #358875).
+
+Upstream status: they asked for some cleanups, which are done. To be submitted.
+
+---
+ quilt/push.in     |    7 +++++++
+ test/missing.test |    4 ++++
+ 2 files changed, 11 insertions(+)
+
+Index: b/quilt/push.in
+===================================================================
+--- a/quilt/push.in
++++ b/quilt/push.in
+@@ -179,6 +179,13 @@
+ 		no_reject_files="-r $tmp"
+ 	fi
+ 
++	if [ ! -e "$patch_file" -a -z "$opt_force" ]
++	then
++		printf $"Patch %s does not exist\n" \
++		       "$(print_patch $patch)" >&2
++		return 1
++	fi
++
+ 	apply_patch $patch "$patch_file"
+ 	status=$?
+ 	trap "" SIGINT
+Index: b/test/missing.test
+===================================================================
+--- a/test/missing.test
++++ b/test/missing.test
+@@ -7,6 +7,10 @@
+ 	< missing2.diff
+ 	
+ 	$ quilt push -qa
++	> Patch patches/missing1.diff does not exist
++	> Applying patch patches/missing1.diff
++	
++	$ quilt push -qaf
+ 	> Applying patch patches/missing1.diff
+ 	> Patch patches/missing1.diff does not exist; applied empty patch
+ 	> Applying patch patches/missing2.diff
+  * Make sure that quilt returns 2 when there is nothing to do so that
+    patchsys-quilt.mk works again. Upstream regression since 0.33.
+    (Closes: #358792).
+
+Upstream status: Submitted 060427
+
+---
+ quilt/push.in             |    2 +-
+ quilt/scripts/patchfns.in |    8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+Index: b/quilt/push.in
+===================================================================
+--- a/quilt/push.in
++++ b/quilt/push.in
+@@ -340,7 +340,7 @@
+ 	[ -z "$opt_all" ] && number=1
+ fi
+ 
+-stop_at_patch=$(find_unapplied_patch "$stop_at_patch") || exit 1
++stop_at_patch=$(find_unapplied_patch "$stop_at_patch") || exit $?
+ 
+ [ -n "$opt_quiet" ] && silent=-s
+ [ -z "$opt_verbose" ] && silent_unless_verbose=-s
+Index: b/quilt/scripts/patchfns.in
+===================================================================
+--- a/quilt/scripts/patchfns.in
++++ b/quilt/scripts/patchfns.in
+@@ -481,7 +481,7 @@
+ 	if [ -z "$patch" ]
+ 	then
+ 		printf $"No patches in series\n" >&2
+-		return 1
++		return 2
+ 	fi
+ 
+ 	echo "$patch"
+@@ -592,7 +592,7 @@
+ 	        then
+ 			printf $"Patch %s is currently applied\n" \
+ 				"$(print_patch $patch)" >&2
+-               		return 1
++               		return 2
+ 	        fi
+ 		echo "$patch"
+ 	else
+@@ -602,13 +602,13 @@
+ 		then
+ 			patch_after "$start"
+ 		else
+-			find_first_patch || return 1
++			find_first_patch || return 2
+ 		fi
+ 		if [ $? -ne 0 ]
+ 		then
+ 			printf $"File series fully applied, ends at patch %s\n" \
+ 				"$(print_patch $start)" >&2
+-			return 1
++			return 2
+ 		fi
+ 	fi
+ }
+  * Let /etc/mailname override the hostname in the mail command
+    (Closes: #356348)
+
+Upstream status: Submitted 060427
+
+---
+ quilt/mail.in |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+Index: b/quilt/mail.in
+===================================================================
+--- a/quilt/mail.in
++++ b/quilt/mail.in
+@@ -263,7 +263,17 @@
+ 
+ if [ -z "$opt_sender" ]
+ then
+-	hostname=$(hostname -f 2>/dev/null)
++	hostname=nowhere
++	if [ -e /etc/mailname ] ; 
++	then
++		hostname=`cat /etc/mailname`
++	fi
++	
++	if [ "$hostname" = "${hostname/.}" ]
++	then
++		hostname=$(hostname -f 2>/dev/null)
++	fi
++	
+ 	if [ "$hostname" = "${hostname/.}" ]
+ 	then
+ 		hostname=$(hostname)
+Cleanup a bit the environment handling around the testsuite.
+
+Upstream status: Submitted 060427
+
+---
+ Makefile.in |    9 +--------
+ test/run    |   20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+), 8 deletions(-)
+
+Index: b/test/run
+===================================================================
+--- a/test/run
++++ b/test/run
+@@ -62,6 +62,26 @@
+ my $lineno;
+ my $width = ($ENV{COLUMNS} || 80) >> 1;
+ 
++# cleanup the environment
++map { 
++  undef $ENV{$_} if defined($ENV{$_}); 
++} qw(QUILT_PATCHES QUILT_PC LANG LC_MESSAGES LC_CTYPE LC_ALL LANGUAGE);
++
++$ENV{'LC_ALL'} = 'C';
++open RC,"test.quiltrc" || die "cannot read RC file: $?\n";
++while (<RC>) {
++    s/#.*$//;
++    if (m/^([^=]*)=(.*)$/) {
++	$ENV{$1}=$2;
++    }
++}
++
++if (defined($ENV{'QUILT_PATCHES_PREFIX'}) && length($ENV{'QUILT_PATCHES_PREFIX'})) {
++    $ENV{'P'}='patches/';
++    $ENV{'_P'}='../patches/';
++}
++
++# Run the tests
+ for (;;) {
+   my $line = <>; $lineno++;
+   if (defined $line) {
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -383,10 +383,6 @@
+ 	    -e 's:quilt/setup:quilt/setup quilt/scripts/inspect:' \
+ 	  > $@
+ 
+-ifneq ($(shell . $(QUILTRC) ;  echo $$QUILT_PATCHES_PREFIX),)
+-CHECK_ENV := P=patches/; _P=../patches/; export P _P
+-endif
+-
+ # Each tests dependencies are stored in test/.depend
+ ifneq ($(findstring check-,$(MAKECMDGOALS)),)
+ test/.%.ok : test/%.test FORCE
+@@ -394,10 +390,7 @@
+ test/.%.ok : test/%.test
+ endif
+ 	@echo "[$(<F)]"
+-	@LANG=C; LC_ALL=C;						\
+-	export LANG LC_ALL;						\
+-	$(CHECK_ENV);							\
+-	cd $(@D);							\
++	@cd $(@D);							\
+ 	./run $(<F)
+ 	@touch $@
+ 
+  * Let the manpage make clearer that literal QUILT_COMMAND_ARGS is
+    not read (Closes: #354997)
+  * Fix several typos (Closes: #386549, #386548, #395447)
+
+Upstream status: not submitted
+
+---
+ bin/guards.in   |    2 +-
+ doc/main.tex    |    2 +-
+ doc/quilt.1.in  |    6 +++---
+ quilt/import.in |    2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
+Index: b/doc/quilt.1.in
+===================================================================
+--- a/doc/quilt.1.in
++++ b/doc/quilt.1.in
+@@ -145,8 +145,8 @@
+ 
+ Upon startup, quilt evaluates the file .quiltrc in the user's home
+ directory, or the file specified with the --quiltrc option.  This file
+-is a regular bash script. Default options can be passed to any command
+-by defining a QUILT_COMMAND_ARGS variable.  For example,
++is a regular bash script. Default options can be passed to any COMMAND
++by defining a QUILT_${COMMAND}_ARGS variable.  For example,
+ QUILT_DIFF_ARGS="--color=auto" causes the output of quilt diff to be
+ syntax colored when writing to a terminal.
+ 
+@@ -193,7 +193,7 @@
+ a shortcut to adding --no-index to both QUILT_DIFF_ARGS and
+ QUILT_REFRESH_ARGS.
+ 
+-.IP QUILT_NO_DIFF_TIMESTAMP 4
++.IP QUILT_NO_DIFF_TIMESTAMPS 4
+ 
+ By default, quilt includes timestamps in headers when generating patches.
+ If this variable is set to anything, no timestamp will be included.  This
+Index: b/bin/guards.in
+===================================================================
+--- a/bin/guards.in
++++ b/bin/guards.in
+@@ -263,7 +263,7 @@
+ file system. If files are referenced in the specification that do not exist, or
+ if files are not enlisted in the specification file warnings are printed. The
+ I<--path> option can be used to specify which directory or directories to scan.
+-Multiple directories are eparated by a colon (C<:>) character. The
++Multiple directories are separated by a colon (C<:>) character. The
+ I<--prefix> option specifies the location of the files.
+ 
+ =head1 AUTHOR
+Index: b/quilt/import.in
+===================================================================
+--- a/quilt/import.in
++++ b/quilt/import.in
+@@ -36,7 +36,7 @@
+ 	Patch filename to use inside quilt. This option can only be
+ 	used when importing a single patch.
+ 
+--f	Overwite/update existing patches.
++-f	Overwrite/update existing patches.
+ 
+ -d {o|a|n}
+ 	When overwriting in existing patch, keep the old (o), all (a), or
+Index: b/doc/main.tex
+===================================================================
+--- a/doc/main.tex
++++ b/doc/main.tex
+@@ -576,7 +576,7 @@
+ 	approach will often result in false positives, the latter
+ 	approach may result in false negatives (that is, \quilt{graph}
+ 	may overlook dependencies).
+-} The ouput of this command can be visualized using the tools from AT\&T
++} The output of this command can be visualized using the tools from AT\&T
+ Research's Graph Visualization Project (GraphViz,
+ \url{http://www.graphviz.org/}).  The \quilt{graph} command supports
+ different kinds of graphs.
+From: Romain Francoise
+Closes: #436936
+
+Here's a patch for this bug; it's necessary because during the
+Debian build process the top-level makefile is debian/rules and make
+adds -w to MAKEFLAGS for sub-makes, causing the messages to appear
+in the documentation when these targets are run.  During a normal
+build the makefile is not run by a sub-make so this bug isn't
+triggered.
+
+Upstream status: not submitted
+
+---
+ Makefile.in |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -183,7 +183,7 @@
+ 	@while read line; do						\
+ 		case "$$line" in					\
+ 		'@REFERENCE''@')					\
+-			$(MAKE) -s reference				\
++			$(MAKE) -s --no-print-directory reference	\
+ 			;;						\
+ 		*)							\
+ 			printf "%s\n" "$$line"				\
+@@ -196,7 +196,7 @@
+ 	while read line; do						\
+ 	  case "$$line" in						\
+ 	  '@REFERENCE''@')						\
+-	    $(MAKE) -s reference |					\
++	    $(MAKE) -s --no-print-directory reference |       		\
+ 	    $(SED) -e 's/^quilt \([^ ]*\)\(.*\)/.IP "\\fB\1\\fP\2 " 4/'	\
+ 		   -e 's/^  \(-[^\t]*\)\t\?/.IP "    \1" 8\n/'	        \
+ 		   -e 's/^  \t\?//'					\
+@@ -205,7 +205,7 @@
+ 	    printf "%s\n" "$$line"					\
+ 	    ;;								\
+ 	  esac;								\
+-	done < $< 2>&1 > $@
++	done < $< > $@
+ 
+ .PHONY :: reference
+ reference : $(QUILT:%=quilt/%) quilt/scripts/patchfns compat
+---
+ Makefile.in |    1 +
+ 1 file changed, 1 insertion(+)
+
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -142,6 +142,7 @@
+ 	$(MSGFMT) --statistics -o $@ $<
+ 
+ %.po : po/quilt.pot
++	$(MSGUNIQ) -o $@.tmp $@ && mv $@.tmp $@
+ 	$(MSGMERGE) -o $@ $@ $^
+ 
+ scripts : $(BIN:%=bin/%) $(QUILT:%=quilt/%) 				\
+Displays an error message when the $SERIES file does not exist and when run
+in verbose mode.
+
+Closes: #369908
+
+Status wrt upstream: not submitted.
+
+
+---
+ quilt/scripts/patchfns.in |    3 +++
+ 1 file changed, 3 insertions(+)
+
+Index: b/quilt/scripts/patchfns.in
+===================================================================
+--- a/quilt/scripts/patchfns.in
++++ b/quilt/scripts/patchfns.in
+@@ -349,6 +349,9 @@
+ 		sed -e '/^#/d' -e 's/^[ '$'\t'']*//' \
+ 		    -e 's/[ '$'\t''].*//' -e '/^$/d' $SERIES
+ 	else
++		if [ "$opt_verbose" ]; then
++			echo "series file not found: $SERIES" >&2
++		fi
+ 		return 1
+ 	fi
+ }
+Let patch-wrapper die with an informative message when /proc is not mounted
+althrough it needs it to pass the patching request to GNU patch since it
+fails to understand all options.
+
+---
+ bin/patch-wrapper.in |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+Index: b/bin/patch-wrapper.in
+===================================================================
+--- a/bin/patch-wrapper.in
++++ b/bin/patch-wrapper.in
+@@ -171,6 +171,10 @@
+     if [ -n "$opt_input" ]
+     then
+ 	patch=$opt_input
++    elif [ ! -e /proc/self ]
++    then
++        echo "patch-wrapper: /proc not mounted!" >&2
++	exit 1
+     elif [ -e /proc/self/fd/0 ]
+     then
+ 	patch=$(readlink /proc/self/fd/0)
+---
+ test/mail.test |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+Index: b/test/mail.test
+===================================================================
+--- a/test/mail.test
++++ b/test/mail.test
+@@ -12,7 +12,7 @@
+ 
+ 	$ cat no-subject > patches/1.diff
+ 	$ ls patches/ > series
+-	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
+ 	> Unable to extract a subject header from patches/1.diff
+ 
+ 	$ cat - no-subject > patches/1.diff
+@@ -21,7 +21,7 @@
+ 	< Acked-by: Dummy <dummy@some.where>
+ 	<
+ 
+-	$ quilt mail --mbox mbox --prefix "test" -m "Message"
++	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" -m "Message"
+ 	> Introduction has no subject header
+ 
+ 	$ cat - no-subject > patches/2.diff
+From: Simon Horman <horms@verge.net.au>
+Date: Thu, 19 Apr 2007 17:39:07 +0900
+Subject: Add an option to quilt mail to allow the signature to be specified
+
+This seems like a useful enough feature without need for much explanation.
+But the real motivation for it is that the test suite will fails
+if a .signature file is present, as the output includes the contents
+of .signature whereas the expected output does not.
+
+I guess the test could be changed so as not to compare the signature
+portion, but as this seems like a nice enough feature anyway.
+
+A patch to update the relevant test to use this option follows.
+
+---
+ quilt/mail.in |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+Index: b/quilt/mail.in
+===================================================================
+--- a/quilt/mail.in
++++ b/quilt/mail.in
+@@ -21,7 +21,7 @@
+ 
+ usage()
+ {
+-	printf $"Usage: quilt mail {--mbox file|--send} [-m text] [--prefix prefix] [--sender ...] [--from ...] [--to ...] [--cc ...] [--bcc ...] [--subject ...] [--reply-to message] [first_patch [last_patch]]\n"
++	printf $"Usage: quilt mail {--mbox file|--send} [-m text] [--prefix prefix] [--sender ...] [--from ...] [--to ...] [--cc ...] [--bcc ...] [--subject ...] [--signature file] [--reply-to message] [first_patch [last_patch]]\n"
+ 	if [ x$1 = x-h ]
+ 	then
+ 		printf $"
+@@ -205,6 +205,9 @@
+ 	--mbox)
+ 		opt_mbox=$2
+ 		shift 2 ;;
++	--signature)
++		opt_signature=$2
++		shift 2 ;;
+ 	--charset)
+ 		opt_charset=$2
+ 		shift 2 ;;
+From: Simon Horman <horms@verge.net.au>
+Date: Thu, 19 Apr 2007 17:39:07 +0900
+Subject: Use the new --signature option in mail tests
+
+Make use of the --signature option to specify that there should
+be no .signature file used. Without this .signature will get sucked in
+if present and if this is the case the test will fail as the expected
+output will differ from the actuall output as the latter will contain
+the contents of .signature while the fomer doesn't.
+
+I guess the test could be changed so as not to compare the signature
+portion, but as this seems like a nice enough solution.
+
+---
+ test/mail.test |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+Index: b/test/mail.test
+===================================================================
+--- a/test/mail.test
++++ b/test/mail.test
+@@ -12,7 +12,7 @@
+ 
+ 	$ cat no-subject > patches/1.diff
+ 	$ ls patches/ > series
+-	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" --subject "This is a test" -m "Message" --signature -
+ 	> Unable to extract a subject header from patches/1.diff
+ 
+ 	$ cat - no-subject > patches/1.diff
+@@ -21,7 +21,7 @@
+ 	< Acked-by: Dummy <dummy@some.where>
+ 	<
+ 
+-	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" -m "Message"
++	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" -m "Message" --signature -
+ 	> Introduction has no subject header
+ 
+ 	$ cat - no-subject > patches/2.diff
+@@ -55,7 +55,7 @@
+ 	<
+ 
+ 	$ ls patches/ > series
+-	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message" --signature -
+ 	> Patches patches/1.diff, patches/5.diff have duplicate subject headers.
+ 
+ 	$ cat - no-subject > patches/5.diff
+@@ -67,7 +67,7 @@
+ 	<
+ 
+ 	$ ls patches/ > series
+-	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message" --signature -
+ 	$ sed -nre "s/^(From [^ ]*).*/\\1/p" -e "/^Subject:/p" -e "/^To:/p" -e "/^Cc:/p" -e "/^ /p" -e "/^Replace-.*:/p" -e "/^Recipient-.*:/p" mbox
+ 	> From a@b.c
+ 	> Subject: [test 0/6] This is a test
+From: Simon Horman <horms@verge.net.au>
+Date: Thu, 19 Apr 2007 17:39:07 +0900
+Subject: Force locale to C when generating date for From header
+
+Without this the From header will end up with a date according
+to the pervailing locale, which I believe results in an invalid
+mbox - muttng doesn't like it anyway.
+
+Tested with the following environment:
+
+# LANG=ja_JP.utf8
+LANGUAGE=ja_JP.utf8
+LC_CTYPE="ja_JP.utf8"
+LC_NUMERIC="ja_JP.utf8"
+LC_TIME="ja_JP.utf8"
+LC_COLLATE="ja_JP.utf8"
+LC_MONETARY="ja_JP.utf8"
+LC_MESSAGES="ja_JP.utf8"
+LC_PAPER="ja_JP.utf8"
+LC_NAME="ja_JP.utf8"
+LC_ADDRESS="ja_JP.utf8"
+LC_TELEPHONE="ja_JP.utf8"
+LC_MEASUREMENT="ja_JP.utf8"
+LC_IDENTIFICATION="ja_JP.utf8"
+LC_ALL=ja_JP.utf8
+
+---
+ quilt/mail.in |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: b/quilt/mail.in
+===================================================================
+--- a/quilt/mail.in
++++ b/quilt/mail.in
+@@ -137,7 +137,7 @@
+ 		| ${QUILT_SENDMAIL:-sendmail} \
+ 			${QUILT_SENDMAIL_ARGS--f "$opt_sender"} "$@"
+ 	else
+-		local from_date=$(date "+%a %b %e %H:%M:%S %Y")
++		local from_date=$(LC_ALL=C date "+%a %b %e %H:%M:%S %Y")
+ 		echo "From $opt_sender_address $from_date"
+ 		sed -e 's/^From />From /' $tmpfile
+ 		echo
+---
+ quilt/snapshot.in |    1 +
+ 1 file changed, 1 insertion(+)
+
+Index: b/quilt/snapshot.in
+===================================================================
+--- a/quilt/snapshot.in
++++ b/quilt/snapshot.in
+@@ -74,6 +74,7 @@
+ fi
+ 
+ # Save current working state
++create_db
+ mkdir -p $QUILT_PC/$snap_subdir
+ for patch in $(applied_patches); do
+ 	files_in_patch $patch
+From: "brian m. carlson" <sandals@crustytoothpaste.ath.cx>
+Subject: quilt: breaks when POSIXLY_CORRECT=1
+Date: Fri, 25 Jan 2008 20:02:28 +0000
+Closes: #462578
+
+quilt breaks when POSIXLY_CORRECT is set to 1, because it invokes
+patch, and patch does not work non-interactively in POSIX mode.  (I
+believe this is the mandated behavior, unfortunate as it is.) If you
+want to rely on non-POSIX semantics of patch, you should unset
+POSIXLY_CORRECT (and probably _POSIX2_VERSION and POSIXLY_PEDANTIC as
+well).
+
+
+---
+ bin/quilt.in |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+Index: b/bin/quilt.in
+===================================================================
+--- a/bin/quilt.in
++++ b/bin/quilt.in
+@@ -6,6 +6,10 @@
+ #
+ #  See the COPYING and AUTHORS files for more details.
+ 
++# unset posix strict conformance variables since patch cannot be run
++# non-interactively when they are set (doh!).
++unset POSIXLY_CORRECT _POSIX2_VERSION POSIXLY_PEDANTIC
++
+ export TEXTDOMAIN=quilt
+ export TEXTDOMAINDIR=@LOCALEDIR@
+ 
+---
+ quilt/shell.in |   67 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+
+Index: b/quilt/shell.in
+===================================================================
+--- /dev/null
++++ b/quilt/shell.in
+@@ -0,0 +1,67 @@
++#! @BASH@
++
++#  This script is free software; you can redistribute it and/or modify
++#  it under the terms of the GNU General Public License version 2 as
++#  published by the Free Software Foundation.
++#
++#  See the COPYING and AUTHORS files for more details.
++
++# Read in library functions
++if [ "$(type -t patch_file_name)" != function ]
++then
++        if ! [ -r $QUILT_DIR/scripts/patchfns ]
++        then
++                echo "Cannot read library $QUILT_DIR/scripts/patchfns" >&2
++                exit 1
++        fi
++        . $QUILT_DIR/scripts/patchfns
++fi
++
++if [ "$1" = "-h" ]; then
++    printf $"Usage: quilt shell [command]\n"
++    printf $"
++Launch a shell in a duplicate environment. After exiting the shell, any
++modifications made in this environment are applied to the topmost patch.
++
++If a command is specified, it is executed instead of launching the shell.
++"
++    exit 0
++fi
++
++tmpdir=$(mktemp -d /tmp/quilt-XXXXXX)
++
++cp -a . $tmpdir
++
++(
++    cd $tmpdir/"$SUBDIR"
++    if [ $# -gt 0 ]; then
++        exec "$@"
++    else
++        $SHELL
++    fi
++)
++
++# Find new directories
++( cd $tmpdir; find . -type d ! -path ./"$QUILT_PC"/\* ! -path ./"$QUILT_PATCHES"/\* ) | while read dir; do
++    if [ ! -d "$dir" ]; then
++        mkdir -p "$dir"
++    fi
++done
++
++# New and modified files
++( cd $tmpdir; find . -type f ! -path ./"$QUILT_PC"/\* ! -path ./"$QUILT_PATCHES"/\* ) | while read file; do
++    if [ ! -f "$file" ] || ! diff -q "$file" $tmpdir/"$file" > /dev/null 2>&1; then
++        quilt_command add "$file"
++        cp -a $tmpdir/"$file" "$file"
++    fi
++done
++
++# Removed files
++( find . -type f ! -path ./"$QUILT_PC"/\* ! -path ./"$QUILT_PATCHES"/\* ) | while read file; do
++    if [ ! -f $tmpdir/"$file" ]; then
++        quilt_command add "$file"
++        rm -f "$file"
++    fi
++done
++
++rm -rf $tmpdir
+Description: use Debian's sensible-editor instead of trying to guess the editor
+ the original bug that triggered this change was that quilt doesn't honour $VISUAL
+Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=509076
+Forwarded: not-needed
+Author: Ryan Niebur <ryanryan52@gmail.com>
+
+---
+ quilt/edit.in   |    4 +---
+ quilt/header.in |    4 +---
+ quilt/mail.in   |    4 +---
+ 3 files changed, 3 insertions(+), 9 deletions(-)
+
+--- a/quilt/edit.in
++++ b/quilt/edit.in
+@@ -6,8 +6,6 @@
+ #
+ #  See the COPYING and AUTHORS files for more details.
+ 
+-: ${EDITOR:=vi}
+-
+ # Read in library functions
+ if [ "$(type -t patch_file_name)" != function ]
+ then
+@@ -65,7 +63,7 @@
+ then
+ 	exit $status
+ fi
+-LANG=$ORIGINAL_LANG $EDITOR "${@/#/$SUBDIR}"
++LANG=$ORIGINAL_LANG sensible-editor "${@/#/$SUBDIR}"
+ status=$?
+ for file in "$@"
+ do
+--- a/quilt/header.in
++++ b/quilt/header.in
+@@ -17,8 +17,6 @@
+ 	. $QUILT_DIR/scripts/patchfns
+ fi
+ 
+-: ${EDITOR:=vi}
+-
+ usage()
+ {
+ 	printf $"Usage: quilt header [-a|-r|-e] [--backup] [--strip-diffstat] [--strip-trailing-whitespace] [patch]\n"
+@@ -149,7 +147,7 @@
+ 
+ 	if [ -n "$opt_edit" ]
+ 	then
+-		LANG=$ORIGINAL_LANG $EDITOR "$tmp" || exit 1
++		LANG=$ORIGINAL_LANG sensible-editor "$tmp" || exit 1
+ 	fi
+ 
+ 	maybe_strip_diffstat < $tmp \
+--- a/quilt/mail.in
++++ b/quilt/mail.in
+@@ -6,8 +6,6 @@
+ #
+ #  See the COPYING and AUTHORS files for more details.
+ 
+-: ${EDITOR:=vi}
+-
+ # Read in library functions
+ if [ "$(type -t patch_file_name)" != function ]
+ then
+@@ -499,7 +497,7 @@
+ 
+ if [ -z "$opt_message" ]
+ then
+-	if ! LANG=$ORIGINAL_LANG $EDITOR $introduction
++	if ! LANG=$ORIGINAL_LANG sensible-editor $introduction
+ 	then
+ 		rm -f $introduction
+ 		exit 1
+--- a/test/edit.test
++++ b/test/edit.test
+@@ -8,6 +8,7 @@ $ cat > editor
+ < sed -e 's:foo:bar:' $1 > $1.new
+ < mv $1.new $1
+ $ chmod +x editor
++$ unset VISUAL
+ $ export EDITOR=%PWD/editor
+ 
+ $ quilt new patch
+Description: Fix testsuite failure with patch >= 2.6
+Origin: upstream, http://git.savannah.gnu.org/cgit/quilt.git/commit/?id=c60ec97737f46fda9fa9cb96f874768f5ccfb57b
+Forwarded: not-needed
+Author: Andreas Gruenbacher <agruen@suse.de>
+
+    Minor test suite update
+    
+    Recognize the output of more recent versions of patch, and set the
+    coreutils quoting style instead of matching different quoting styles.
+
+diff --git a/test/create-delete.test b/test/create-delete.test
+index 7bbfa75..fbd5543 100644
+--- a/test/create-delete.test
++++ b/test/create-delete.test
+@@ -30,12 +30,12 @@ file creates and deletions.
+ 	$ echo create > create
+ 	$ rm -f delete
+ 	$ patch -p1 --dry-run < patches/test.diff
+-	>~ The next patch would create the file `?create'?,
++	> The next patch would create the file create,
+ 	> which already exists!  Assume -R? [n] 
+ 	> Apply anyway? [n] 
+ 	> Skipping patch.
+-	>~ 1 out of 1 hunk ignored -- saving rejects to (file )?create.rej
+-	>~ The next patch would delete the file `?delete'?,
++	>~ 1 out of 1 hunk ignored( -- saving rejects to file create.rej)?
++	> The next patch would delete the file delete,
+ 	> which does not exist!  Assume -R? [n] 
+ 	> Apply anyway? [n] 
+ 	> Skipping patch.
+diff --git a/test/test.quiltrc b/test/test.quiltrc
+index 3c4a5c3..c2f2c86 100644
+--- a/test/test.quiltrc
++++ b/test/test.quiltrc
+@@ -4,3 +4,5 @@ QUILT_REFRESH_ARGS="--no-timestamps"
+ QUILT_MAIL_ARGS="--charset=UTF-8 --sender a@b.c --signature=-"
+ 
+ QUILT_PATCHES_PREFIX=yes
++
++export QUOTING_STYLE=literal
+Description: Make quilt remember the location of QUILT_PATCHES and QUILT_SERIES
+Origin: backport, http://git.savannah.gnu.org/cgit/quilt.git/commit/?id=ebbbdc87e806debd7c2bfb6196fb040be877dd61
+Bug-Debian: http://bugs.debian.org/260664
+Author: Raphaël Hertzog <hertzog@debian.org>
+
+diff --git a/doc/main.tex b/doc/main.tex
+index 698b89c..30acd94 100644
+--- a/doc/main.tex
++++ b/doc/main.tex
+@@ -175,7 +175,9 @@ The remainder of this document discusses the script collection
+ 
+ With quilt, all work occurs within a single directory tree. Since
+ version 0.30, commands can be invoked from anywhere within the source
+-tree.  Commands are of the form ``\quilt{cmd}'', similar to CVS
++tree (the directory tree is scanned upwards until either the
++\textsf{.pc} or the \textsf{patches} directory is found).
++Commands are of the form ``\quilt{cmd}'', similar to CVS
+ commands. They can be abbreviated as long as the specified part of the
+ command is unique. All commands print some help text with ``\quilt{cmd
+ -h}''.
+@@ -198,7 +200,9 @@ After the refresh, the patch and the working state are the same.
+ 
+ Patch files are located in the \textsf{patches} sub-directory of the
+ source tree (see Figure~\ref{fig:dir-layout}). The \textsf{QUILT\_PATCHES}
+-environment variable can be used to override this location. The
++environment variable can be used to override this location and quilt
++will remember this location by storing its value in the
++\textsf{.pc/.quilt\_patches} file. The
+ \textsf{patches} directory may contain sub-directories.
+ \textsf{patches} may also be a symbolic link instead of a directory.
+ 
+diff --git a/quilt/scripts/patchfns.in b/quilt/scripts/patchfns.in
+index fbe8f7b..9528d2c 100644
+--- a/quilt/scripts/patchfns.in
++++ b/quilt/scripts/patchfns.in
+@@ -20,7 +20,6 @@ export LANG=POSIX
+ export QUILT_PATCHES QUILT_PC SUBDIR SERIES DB
+ DB_VERSION=2
+ 
+-: ${QUILT_PATCHES:=patches}
+ : ${QUILT_PC:=.pc}
+ 
+ # Support compatibility layer
+@@ -950,6 +949,14 @@ create_db() {
+ 		mkdir -p $QUILT_PC
+ 		echo $DB_VERSION > $QUILT_PC/.version
+ 	fi
++	if ! [ -e $QUILT_PC/.quilt_patches ]
++	then
++		echo "$QUILT_PATCHES" > $QUILT_PC/.quilt_patches
++	fi
++	if ! [ -e $QUILT_PC/.quilt_series ]
++	then
++		echo "$QUILT_SERIES" > $QUILT_PC/.quilt_series
++	fi
+ }
+ 
+ version_check() {
+@@ -1052,14 +1059,14 @@ setup_pager()
+ # drivers/net/.
+ 
+ unset SUBDIR SUBDIR_DOWN
+-if ! [ -d "$QUILT_PATCHES" ]
++if ! [ -d "$QUILT_PC" -o -d "${QUILT_PATCHES:-patches}" ]
+ then
+     basedir=$PWD
+     while [ -n "$basedir" ]
+     do
+ 	basedir=${basedir%/*}
+ 	down=$down../
+-	if [ -d "$basedir/$QUILT_PATCHES" ]
++	if [ -d "$basedir/$QUILT_PC" -o -d "$basedir/${QUILT_PATCHES:-patches}" ]
+ 	then
+ 	    SUBDIR="${PWD#$basedir/}/"
+ 	    SUBDIR_DOWN=$down
+@@ -1074,7 +1081,18 @@ then
+     unset basedir down
+ fi
+ 
+-: ${QUILT_SERIES:=series}
++if [ -r $QUILT_PC/.quilt_patches ]
++then
++	: ${QUILT_PATCHES:=$(< $QUILT_PC/.quilt_patches)}
++else
++	: ${QUILT_PATCHES:=patches}
++fi
++if [ -r $QUILT_PC/.quilt_series ]
++then
++	: ${QUILT_SERIES:=$(< $QUILT_PC/.quilt_series)}
++else
++	: ${QUILT_SERIES:=series}
++fi
+ 
+ if [ "${QUILT_SERIES:0:1}" = / ]
+ then
+diff --git a/test/remember-locations.test b/test/remember-locations.test
+new file mode 100644
+index 0000000..c1b340c
+--- /dev/null
++++ b/test/remember-locations.test
+@@ -0,0 +1,30 @@
++	$ rm -rf d
++	$ mkdir -p d/my/changes
++	$ cd d
++
++	$ export QUILT_PATCHES=my/changes
++	$ export QUILT_SERIES=patchlist
++	$ quilt new mychange1
++	> Patch my/changes/mychange1 is now on top
++	$ unset QUILT_PATCHES
++	$ unset QUILT_SERIES
++	$ cat .pc/.quilt_patches
++	> my/changes
++	$ cat .pc/.quilt_series
++	> patchlist
++	$ cat my/changes/patchlist
++	> mychange1
++
++	# Verify that the custom location is still used even
++	# if QUILT_PATCHES is not set 
++	$ quilt new mychange2
++	> Patch my/changes/mychange2 is now on top
++	# Verify that the root directory can be identified even
++	# without QUILT_PATCHES with the .pc directory
++	$ cd my
++	$ quilt applied
++	> ../my/changes/mychange1
++	> ../my/changes/mychange2
++
++	$ cd ../..
++	$ rm -rf d
+From 887c46f2a53d054e3b7022003e7c0678652066fc Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Rapha=C3=ABl=20Hertzog?= <hertzog@debian.org>
+Date: Sat, 23 Jan 2010 22:22:39 +0100
+Subject: [PATCH] Skip non-files when selecting the SERIES file
+
+When selecting the location of the SERIES file, ensure that we
+don't accidentally select a non-file (for example a directory)
+when there still are other locations to try.
+
+Bug-Debian: http://bugs.debian.org/546393
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+bug/428657
+---
+ quilt/scripts/patchfns.in |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/quilt/scripts/patchfns.in b/quilt/scripts/patchfns.in
+index 9528d2c..05b7c63 100644
+--- a/quilt/scripts/patchfns.in
++++ b/quilt/scripts/patchfns.in
+@@ -1094,13 +1094,13 @@ else
+ 	: ${QUILT_SERIES:=series}
+ fi
+ 
+-if [ "${QUILT_SERIES:0:1}" = / ]
++if [ "${QUILT_SERIES:0:1}" = / -a \( -f $QUILT_SERIES -o ! -e $QUILT_SERIES \) ]
+ then
+ 	SERIES=$QUILT_SERIES
+-elif [ -e $QUILT_PC/$QUILT_SERIES ]
++elif [ -f $QUILT_PC/$QUILT_SERIES ]
+ then
+ 	SERIES=$QUILT_PC/$QUILT_SERIES
+-elif [ -e $QUILT_SERIES ]
++elif [ -f $QUILT_SERIES ]
+ then
+ 	SERIES=$QUILT_SERIES
+ else
+-- 
+1.6.6
+
+Subject: avoid test failure in setup.test by hardcoding QUILT_PATCHES
+
+Without this patch, quilt setup would try to use debian/patches instead
+of patches and would fail. This is because quilt now initializes
+QUILT_PATCHES by looking up parent directories and it would find
+.pc/.quilt_patches of the debian source package.
+
+The right upstream fix is probably to hardcode the location in quilt setup
+but until that is approved, this fix is less intrusive and doesn't change
+the behaviour of quilt setup.
+
+Bug-Debian: http://bugs.debian.org/573689
+
+diff --git a/test/setup.test b/test/setup.test
+index e1744c7..3ba1b65 100644
+--- a/test/setup.test
++++ b/test/setup.test
+@@ -1,3 +1,4 @@
++$ export QUILT_PATCHES=patches
+ $ rm -rf d
+ $ mkdir -p d/dir
+ $ cd d

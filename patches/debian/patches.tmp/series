@@ -1,0 +1,27 @@
+fix-manpage-generation
+arch_all
+debianize
+fail_on_missing
+return2
+mailname
+testsuite_cleanups
+doc_improvement
+makefile_glitche
+# Works only with patch 2.6 and newer currently and we don't want to break
+# backports (see #560621 for discussion)
+# test_broken_patches
+po-fix-msguniq
+check_SERIES_exists
+patch-wrapper_do_depend_on_proc
+override_mail_sender_in_testsuite
+mail-signature
+no-signature-test
+mail-from-locale
+create_db_on_snapshot
+unset_posix_strict_conformance_variables
+shell-subcommand
+use-sensible-editor
+test-suite-update-for-patch-2.6
+backport-remember-locations
+skip-non-files-for-series
+fix-test-setup

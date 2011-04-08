@@ -1,0 +1,16 @@
+---
+ Makefile.in |    1 +
+ 1 file changed, 1 insertion(+)
+
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -142,6 +142,7 @@
+ 	$(MSGFMT) --statistics -o $@ $<
+ 
+ %.po : po/quilt.pot
++	$(MSGUNIQ) -o $@.tmp $@ && mv $@.tmp $@
+ 	$(MSGMERGE) -o $@ $@ $^
+ 
+ scripts : $(BIN:%=bin/%) $(QUILT:%=quilt/%) 				\

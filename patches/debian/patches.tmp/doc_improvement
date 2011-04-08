@@ -1,0 +1,76 @@
+  * Let the manpage make clearer that literal QUILT_COMMAND_ARGS is
+    not read (Closes: #354997)
+  * Fix several typos (Closes: #386549, #386548, #395447)
+
+Upstream status: not submitted
+
+---
+ bin/guards.in   |    2 +-
+ doc/main.tex    |    2 +-
+ doc/quilt.1.in  |    6 +++---
+ quilt/import.in |    2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
+Index: b/doc/quilt.1.in
+===================================================================
+--- a/doc/quilt.1.in
++++ b/doc/quilt.1.in
+@@ -145,8 +145,8 @@
+ 
+ Upon startup, quilt evaluates the file .quiltrc in the user's home
+ directory, or the file specified with the --quiltrc option.  This file
+-is a regular bash script. Default options can be passed to any command
+-by defining a QUILT_COMMAND_ARGS variable.  For example,
++is a regular bash script. Default options can be passed to any COMMAND
++by defining a QUILT_${COMMAND}_ARGS variable.  For example,
+ QUILT_DIFF_ARGS="--color=auto" causes the output of quilt diff to be
+ syntax colored when writing to a terminal.
+ 
+@@ -193,7 +193,7 @@
+ a shortcut to adding --no-index to both QUILT_DIFF_ARGS and
+ QUILT_REFRESH_ARGS.
+ 
+-.IP QUILT_NO_DIFF_TIMESTAMP 4
++.IP QUILT_NO_DIFF_TIMESTAMPS 4
+ 
+ By default, quilt includes timestamps in headers when generating patches.
+ If this variable is set to anything, no timestamp will be included.  This
+Index: b/bin/guards.in
+===================================================================
+--- a/bin/guards.in
++++ b/bin/guards.in
+@@ -263,7 +263,7 @@
+ file system. If files are referenced in the specification that do not exist, or
+ if files are not enlisted in the specification file warnings are printed. The
+ I<--path> option can be used to specify which directory or directories to scan.
+-Multiple directories are eparated by a colon (C<:>) character. The
++Multiple directories are separated by a colon (C<:>) character. The
+ I<--prefix> option specifies the location of the files.
+ 
+ =head1 AUTHOR
+Index: b/quilt/import.in
+===================================================================
+--- a/quilt/import.in
++++ b/quilt/import.in
+@@ -36,7 +36,7 @@
+ 	Patch filename to use inside quilt. This option can only be
+ 	used when importing a single patch.
+ 
+--f	Overwite/update existing patches.
++-f	Overwrite/update existing patches.
+ 
+ -d {o|a|n}
+ 	When overwriting in existing patch, keep the old (o), all (a), or
+Index: b/doc/main.tex
+===================================================================
+--- a/doc/main.tex
++++ b/doc/main.tex
+@@ -576,7 +576,7 @@
+ 	approach will often result in false positives, the latter
+ 	approach may result in false negatives (that is, \quilt{graph}
+ 	may overlook dependencies).
+-} The ouput of this command can be visualized using the tools from AT\&T
++} The output of this command can be visualized using the tools from AT\&T
+ Research's Graph Visualization Project (GraphViz,
+ \url{http://www.graphviz.org/}).  The \quilt{graph} command supports
+ different kinds of graphs.

@@ -1,0 +1,40 @@
+Description: Fix testsuite failure with patch >= 2.6
+Origin: upstream, http://git.savannah.gnu.org/cgit/quilt.git/commit/?id=c60ec97737f46fda9fa9cb96f874768f5ccfb57b
+Forwarded: not-needed
+Author: Andreas Gruenbacher <agruen@suse.de>
+
+    Minor test suite update
+    
+    Recognize the output of more recent versions of patch, and set the
+    coreutils quoting style instead of matching different quoting styles.
+
+diff --git a/test/create-delete.test b/test/create-delete.test
+index 7bbfa75..fbd5543 100644
+--- a/test/create-delete.test
++++ b/test/create-delete.test
+@@ -30,12 +30,12 @@ file creates and deletions.
+ 	$ echo create > create
+ 	$ rm -f delete
+ 	$ patch -p1 --dry-run < patches/test.diff
+-	>~ The next patch would create the file `?create'?,
++	> The next patch would create the file create,
+ 	> which already exists!  Assume -R? [n] 
+ 	> Apply anyway? [n] 
+ 	> Skipping patch.
+-	>~ 1 out of 1 hunk ignored -- saving rejects to (file )?create.rej
+-	>~ The next patch would delete the file `?delete'?,
++	>~ 1 out of 1 hunk ignored( -- saving rejects to file create.rej)?
++	> The next patch would delete the file delete,
+ 	> which does not exist!  Assume -R? [n] 
+ 	> Apply anyway? [n] 
+ 	> Skipping patch.
+diff --git a/test/test.quiltrc b/test/test.quiltrc
+index 3c4a5c3..c2f2c86 100644
+--- a/test/test.quiltrc
++++ b/test/test.quiltrc
+@@ -4,3 +4,5 @@ QUILT_REFRESH_ARGS="--no-timestamps"
+ QUILT_MAIL_ARGS="--charset=UTF-8 --sender a@b.c --signature=-"
+ 
+ QUILT_PATCHES_PREFIX=yes
++
++export QUOTING_STYLE=literal

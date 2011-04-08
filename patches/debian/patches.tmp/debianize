@@ -1,0 +1,36 @@
+Change some little glitches to fit better the Debian conventions.
+
+Upstream status: not applicable
+
+---
+ Makefile.in    |    2 +-
+ doc/quilt.1.in |    3 +--
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+Index: b/Makefile.in
+===================================================================
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -256,7 +256,7 @@
+ 		-e 's:@VERSION''@:$(VERSION):g'				\
+ 		-e 's:@RELEASE''@:$(RELEASE):g'				\
+ 		-e 's:@LOCALEDIR''@:$(localedir):g'			\
+-		-e 's:@DOCSUBDIR''@:$(docdir)/$(PACKAGE)-$(VERSION):g'	\
++		-e 's:@DOCSUBDIR''@:$(docdir)/$(PACKAGE):g'		\
+ 		$< > $@
+ 	@$(if $(filter-out $<,$(NON_EXEC_IN)),chmod +x $@)
+ 
+Index: b/doc/quilt.1.in
+===================================================================
+--- a/doc/quilt.1.in
++++ b/doc/quilt.1.in
+@@ -217,8 +217,7 @@
+ 
+ .SH SEE ALSO
+ 
+-The pdf documentation, which should be under /usr/share/doc/quilt/quilt.pdf.
+-Note that some distributors compress this file. 
++The pdf documentation, under /usr/share/doc/quilt/quilt.pdf.gz
+ .BR zxpdf ( 1 )
+ can be used to display compressed pdf files.
+ 

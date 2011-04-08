@@ -1,0 +1,131 @@
+Description: Make quilt remember the location of QUILT_PATCHES and QUILT_SERIES
+Origin: backport, http://git.savannah.gnu.org/cgit/quilt.git/commit/?id=ebbbdc87e806debd7c2bfb6196fb040be877dd61
+Bug-Debian: http://bugs.debian.org/260664
+Author: Raphaël Hertzog <hertzog@debian.org>
+
+diff --git a/doc/main.tex b/doc/main.tex
+index 698b89c..30acd94 100644
+--- a/doc/main.tex
++++ b/doc/main.tex
+@@ -175,7 +175,9 @@ The remainder of this document discusses the script collection
+ 
+ With quilt, all work occurs within a single directory tree. Since
+ version 0.30, commands can be invoked from anywhere within the source
+-tree.  Commands are of the form ``\quilt{cmd}'', similar to CVS
++tree (the directory tree is scanned upwards until either the
++\textsf{.pc} or the \textsf{patches} directory is found).
++Commands are of the form ``\quilt{cmd}'', similar to CVS
+ commands. They can be abbreviated as long as the specified part of the
+ command is unique. All commands print some help text with ``\quilt{cmd
+ -h}''.
+@@ -198,7 +200,9 @@ After the refresh, the patch and the working state are the same.
+ 
+ Patch files are located in the \textsf{patches} sub-directory of the
+ source tree (see Figure~\ref{fig:dir-layout}). The \textsf{QUILT\_PATCHES}
+-environment variable can be used to override this location. The
++environment variable can be used to override this location and quilt
++will remember this location by storing its value in the
++\textsf{.pc/.quilt\_patches} file. The
+ \textsf{patches} directory may contain sub-directories.
+ \textsf{patches} may also be a symbolic link instead of a directory.
+ 
+diff --git a/quilt/scripts/patchfns.in b/quilt/scripts/patchfns.in
+index fbe8f7b..9528d2c 100644
+--- a/quilt/scripts/patchfns.in
++++ b/quilt/scripts/patchfns.in
+@@ -20,7 +20,6 @@ export LANG=POSIX
+ export QUILT_PATCHES QUILT_PC SUBDIR SERIES DB
+ DB_VERSION=2
+ 
+-: ${QUILT_PATCHES:=patches}
+ : ${QUILT_PC:=.pc}
+ 
+ # Support compatibility layer
+@@ -950,6 +949,14 @@ create_db() {
+ 		mkdir -p $QUILT_PC
+ 		echo $DB_VERSION > $QUILT_PC/.version
+ 	fi
++	if ! [ -e $QUILT_PC/.quilt_patches ]
++	then
++		echo "$QUILT_PATCHES" > $QUILT_PC/.quilt_patches
++	fi
++	if ! [ -e $QUILT_PC/.quilt_series ]
++	then
++		echo "$QUILT_SERIES" > $QUILT_PC/.quilt_series
++	fi
+ }
+ 
+ version_check() {
+@@ -1052,14 +1059,14 @@ setup_pager()
+ # drivers/net/.
+ 
+ unset SUBDIR SUBDIR_DOWN
+-if ! [ -d "$QUILT_PATCHES" ]
++if ! [ -d "$QUILT_PC" -o -d "${QUILT_PATCHES:-patches}" ]
+ then
+     basedir=$PWD
+     while [ -n "$basedir" ]
+     do
+ 	basedir=${basedir%/*}
+ 	down=$down../
+-	if [ -d "$basedir/$QUILT_PATCHES" ]
++	if [ -d "$basedir/$QUILT_PC" -o -d "$basedir/${QUILT_PATCHES:-patches}" ]
+ 	then
+ 	    SUBDIR="${PWD#$basedir/}/"
+ 	    SUBDIR_DOWN=$down
+@@ -1074,7 +1081,18 @@ then
+     unset basedir down
+ fi
+ 
+-: ${QUILT_SERIES:=series}
++if [ -r $QUILT_PC/.quilt_patches ]
++then
++	: ${QUILT_PATCHES:=$(< $QUILT_PC/.quilt_patches)}
++else
++	: ${QUILT_PATCHES:=patches}
++fi
++if [ -r $QUILT_PC/.quilt_series ]
++then
++	: ${QUILT_SERIES:=$(< $QUILT_PC/.quilt_series)}
++else
++	: ${QUILT_SERIES:=series}
++fi
+ 
+ if [ "${QUILT_SERIES:0:1}" = / ]
+ then
+diff --git a/test/remember-locations.test b/test/remember-locations.test
+new file mode 100644
+index 0000000..c1b340c
+--- /dev/null
++++ b/test/remember-locations.test
+@@ -0,0 +1,30 @@
++	$ rm -rf d
++	$ mkdir -p d/my/changes
++	$ cd d
++
++	$ export QUILT_PATCHES=my/changes
++	$ export QUILT_SERIES=patchlist
++	$ quilt new mychange1
++	> Patch my/changes/mychange1 is now on top
++	$ unset QUILT_PATCHES
++	$ unset QUILT_SERIES
++	$ cat .pc/.quilt_patches
++	> my/changes
++	$ cat .pc/.quilt_series
++	> patchlist
++	$ cat my/changes/patchlist
++	> mychange1
++
++	# Verify that the custom location is still used even
++	# if QUILT_PATCHES is not set 
++	$ quilt new mychange2
++	> Patch my/changes/mychange2 is now on top
++	# Verify that the root directory can be identified even
++	# without QUILT_PATCHES with the .pc directory
++	$ cd my
++	$ quilt applied
++	> ../my/changes/mychange1
++	> ../my/changes/mychange2
++
++	$ cd ../..
++	$ rm -rf d

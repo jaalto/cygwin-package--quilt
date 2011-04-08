@@ -1,0 +1,41 @@
+From: Simon Horman <horms@verge.net.au>
+Date: Thu, 19 Apr 2007 17:39:07 +0900
+Subject: Add an option to quilt mail to allow the signature to be specified
+
+This seems like a useful enough feature without need for much explanation.
+But the real motivation for it is that the test suite will fails
+if a .signature file is present, as the output includes the contents
+of .signature whereas the expected output does not.
+
+I guess the test could be changed so as not to compare the signature
+portion, but as this seems like a nice enough feature anyway.
+
+A patch to update the relevant test to use this option follows.
+
+---
+ quilt/mail.in |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+Index: b/quilt/mail.in
+===================================================================
+--- a/quilt/mail.in
++++ b/quilt/mail.in
+@@ -21,7 +21,7 @@
+ 
+ usage()
+ {
+-	printf $"Usage: quilt mail {--mbox file|--send} [-m text] [--prefix prefix] [--sender ...] [--from ...] [--to ...] [--cc ...] [--bcc ...] [--subject ...] [--reply-to message] [first_patch [last_patch]]\n"
++	printf $"Usage: quilt mail {--mbox file|--send} [-m text] [--prefix prefix] [--sender ...] [--from ...] [--to ...] [--cc ...] [--bcc ...] [--subject ...] [--signature file] [--reply-to message] [first_patch [last_patch]]\n"
+ 	if [ x$1 = x-h ]
+ 	then
+ 		printf $"
+@@ -205,6 +205,9 @@
+ 	--mbox)
+ 		opt_mbox=$2
+ 		shift 2 ;;
++	--signature)
++		opt_signature=$2
++		shift 2 ;;
+ 	--charset)
+ 		opt_charset=$2
+ 		shift 2 ;;

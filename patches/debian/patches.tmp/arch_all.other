@@ -1,0 +1,462 @@
+---
+ Makefile.in                   |   31 ----
+ quilt/add.in                  |    2 
+ quilt/pop.in                  |    4 
+ quilt/push.in                 |    2 
+ quilt/remove.in               |    2 
+ quilt/scripts/backup-files.in |  269 ++++++++++++++++++++++++++++++++++++++++++
+ quilt/snapshot.in             |    2 
+ 7 files changed, 281 insertions(+), 31 deletions(-)
+
+--- quilt-0.45.orig/Makefile.in
++++ quilt-0.45/Makefile.in
+@@ -6,7 +6,6 @@
+ prefix :=	@prefix@
+ exec_prefix :=	@exec_prefix@
+ bindir :=	@bindir@
+-libdir :=	@libdir@
+ datadir :=	@datadir@
+ docdir :=	@docdir@
+ mandir :=	$(datadir)/man
+@@ -49,11 +48,6 @@
+ LIBS :=		@LIBS@
+ EXEEXT :=	@EXEEXT@
+ 
+-LIBOBJS :=	$(filter $(patsubst lib/%.c,lib/%.o,$(wildcard lib/*.c)), $(patsubst %,lib/%,@LIBOBJS@))
+-ifneq ($(LIBOBJS),)
+-CFLAGS += -Ilib
+-endif
+-
+ COMPAT_SYMLINKS	:= @COMPAT_SYMLINKS@
+ COMPAT_PROGRAMS	:= @COMPAT_PROGRAMS@
+ 
+@@ -81,7 +75,7 @@
+ DIRT +=		$(QUILT_IN:%=quilt/%)
+ 
+ SCRIPTS_IN :=	patchfns parse-patch inspect dependency-graph edmail	\
+-		remove-trailing-ws
++		remove-trailing-ws backup-files
+ 
+ SCRIPTS_SRC :=	$(SCRIPTS_IN:%=%.in)
+ SCRIPTS :=	$(SCRIPTS_IN)
+@@ -92,11 +86,6 @@
+ SRC +=		$(wildcard compat/*.in) $(wildcard compat/*.sh)
+ DIRT +=		$(patsubst %.in,%,$(wildcard compat/*.in)) $(COMPAT_SYMLINKS:%=compat/%)
+ 
+-LIB_SRC :=	backup-files.c
+-LIB :=		backup-files$(EXEEXT)
+-SRC +=		$(LIB_SRC:%=lib/%)
+-DIRT +=		lib/backup-files$(EXEEXT) $(LIB_SRC:%.c=lib/%.o)
+-
+ DOC_IN :=	README
+ DOC_SRC :=	$(DOC_IN:%=doc/%.in)
+ DOC :=		$(DOC_IN)
+@@ -126,16 +115,13 @@
+ # Settings for running the uninstalled version of quilt in the source tree:
+ PATH :=		$(CURDIR)/bin:$(CURDIR)/compat:$(PATH)
+ QUILT_DIR :=	$(CURDIR)/quilt
+-QUILT_LIB :=	$(CURDIR)/lib
+ QUILTRC :=	$(CURDIR)/test/test.quiltrc
+-export QUILT_DIR QUILT_LIB QUILTRC
++export QUILT_DIR QUILTRC
+ 
+ #-----------------------------------------------------------------------
+ 
+ all : configure scripts compat $(DOC:%=doc/%) $(MAN1) mofiles
+ 
+-$(LIB:%=lib/%) :: $(LIBOBJS)
+-
+ ifeq ($(USE_NLS),yes)
+ mofiles : $(LINGUAS:%=po/%.mo)
+ else
+@@ -149,7 +135,7 @@
+ 	$(MSGMERGE) -o $@ $@ $^
+ 
+ scripts : $(BIN:%=bin/%) $(QUILT:%=quilt/%) 				\
+-	  $(SCRIPTS:%=quilt/scripts/%) $(LIB:%=lib/%)			\
++	  $(SCRIPTS:%=quilt/scripts/%) 					\
+ 	  $(if $(PATCH_WRAPPER),bin/patch-wrapper)
+ 
+ dist : clean $(PACKAGE)-$(VERSION).tar.gz
+@@ -248,8 +234,7 @@
+ $(patsubst %.in,%,$(wildcard bin/*.in quilt/*.in quilt/scripts/*.in)) :: Makefile
+ % :: %.in
+ 	@echo "$< -> $@" >&2
+-	@$(SED) -e 's:@QUILT_LIB''@:$(libdir)/$(PACKAGE):g'		\
+-		-e 's:@QUILT_DIR''@:$(datadir)/$(PACKAGE):g'		\
++	@$(SED) -e 's:@QUILT_DIR''@:$(datadir)/$(PACKAGE):g'		\
+ 		-e 's:@PERL''@:$(PERL):g'				\
+ 		-e 's:@BASH''@:$(BASH):g'				\
+ 		-e 's:@PATCH''@:$(PATCH):g'				\
+@@ -260,7 +245,7 @@
+ 		$< > $@
+ 	@$(if $(filter-out $<,$(NON_EXEC_IN)),chmod +x $@)
+ 
+-lib/backup-files.o :: Makefile
++#lib/backup-files.o :: Makefile
+ 
+ configure : configure.ac aclocal.m4
+ 	autoconf
+@@ -312,9 +297,6 @@
+ 		   $(BUILD_ROOT)$(datadir)/$(PACKAGE)/wrapper/patch
+ endif
+ 	
+-	$(INSTALL) -d $(BUILD_ROOT)$(libdir)/$(PACKAGE)
+-	$(INSTALL) -m 755 $(LIB:%=lib/%) $(BUILD_ROOT)$(libdir)/$(PACKAGE)/
+-
+ 	$(INSTALL) -d $(BUILD_ROOT)$(docdir)/$(PACKAGE)-$(VERSION)/
+ 	$(INSTALL) -m 644 doc/README					\
+ 		   $(BUILD_ROOT)$(docdir)/$(PACKAGE)-$(VERSION)/
+@@ -349,7 +331,6 @@
+ 
+ uninstall ::
+ 	rm -rf $(BIN:%=$(BUILD_ROOT)$(bindir)/%)			\
+-	       $(BUILD_ROOT)$(libdir)/$(PACKAGE)			\
+ 	       $(BUILD_ROOT)$(datadir)/$(PACKAGE)			\
+ 	       $(patsubst %,$(BUILD_ROOT)$(mandir)/man1/%,		\
+ 		   $(notdir $(MAN1)))					\
+@@ -374,7 +355,7 @@
+ 
+ # Include a run-time generated list of dependencies for each test case
+ test/.depend : Makefile $(TESTS)
+-	@(  printf "%s : bin/quilt quilt/scripts/patchfns $(LIB:%=lib/%) $(COMPAT)\n" $(TESTS); \
++	@(  printf "%s : bin/quilt quilt/scripts/patchfns $(COMPAT)\n" $(TESTS); \
+ 	    $(AWK) 'sub(/.*\$$ *quilt /, "")				\
+ 			{ print FILENAME, ":", "quilt/"$$1}' $(TESTS); \
+ 	    $(AWK) 'sub(/.*\<quilt_command /, "") && ($$1 !~ /[^a-z]/)	\
+--- quilt-0.45.orig/quilt/add.in
++++ quilt-0.45/quilt/add.in
+@@ -121,7 +121,7 @@
+ 		continue
+ 	fi
+ 
+-	if ! $QUILT_LIB/backup-files -b -s -L -B $QUILT_PC/$patch/ $SUBDIR$file
++	if ! $QUILT_DIR/scripts/backup-files -b -s -L -B $QUILT_PC/$patch/ $SUBDIR$file
+ 	then
+ 		printf $"Failed to back up file %s\n" "$SUBDIR$file" >&2
+ 		status=1
+--- quilt-0.45.orig/quilt/pop.in
++++ quilt-0.45/quilt/pop.in
+@@ -167,7 +167,7 @@
+ 			status=0
+ 		else
+ 			printf $"Removing patch %s\n" "$(print_patch $patch)"
+-			$QUILT_LIB/backup-files $silent -r -t -B $QUILT_PC/$patch/ -
++			$QUILT_DIR/scripts/backup-files $silent -r -t -B $QUILT_PC/$patch/ -
+ 			status=$?
+ 		fi
+ 		remove_from_db $patch
+@@ -269,7 +269,7 @@
+ 	# of one: This will automatically be the case in the usual
+ 	# situations, but we don't want to risk file corruption in weird
+ 	# corner cases such as files added to a patch but not modified.
+-	$QUILT_LIB/backup-files -L -s -B $QUILT_PC/$patch/ -
++	$QUILT_DIR/scripts/backup-files -L -s -B $QUILT_PC/$patch/ -
+ 	printf $"Now at patch %s\n" "$(print_patch $patch)"
+ fi
+ ### Local Variables:
+--- quilt-0.45.orig/quilt/push.in
++++ quilt-0.45/quilt/push.in
+@@ -139,7 +139,7 @@
+ {
+ 	local patch=$1
+ 
+-	$QUILT_LIB/backup-files $silent_unless_verbose -r -B $QUILT_PC/$patch/ -
++	$QUILT_DIR/scripts/backup-files $silent_unless_verbose -r -B $QUILT_PC/$patch/ -
+ }
+ 
+ cleanup_patch_output() {
+--- quilt-0.45.orig/quilt/remove.in
++++ quilt-0.45/quilt/remove.in
+@@ -86,7 +86,7 @@
+ 	fi
+ 
+ 	# Restore file from backup
+-	if ! $QUILT_LIB/backup-files -r -t -s -B $QUILT_PC/$patch/ $SUBDIR$file
++	if ! $QUILT_DIR/scripts/backup-files -r -t -s -B $QUILT_PC/$patch/ $SUBDIR$file
+ 	then
+ 		printf $"Failed to remove file %s from patch %s\n" \
+ 		       "$SUBDIR$file" "$(print_patch $patch)" >&2
+--- /dev/null
++++ quilt-0.45/quilt/scripts/backup-files.in
+@@ -0,0 +1,269 @@
++#! @BASH@
++
++set -e
++
++# File: backup-files.sh
++
++# Copyright (C) 2006 Steve Langasek <vorlon@debian.org>
++# portions Copyright (C) 2003, 2004, 2005, 2006 Andreas Gruenbacher
++# <agruen@suse.de>, SuSE Labs
++
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; version 2 dated June, 1991.
++
++# This program is distributed in the hope that it will be useful, but 
++# WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU 
++# General Public License for more details.
++
++# You should have received a copy of the GNU General Public License 
++# along with this program;  if not, write to the Free Software
++# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++# MA 02110-1301, USA.
++
++
++# Create backup files of a list of files similar to GNU patch. A path
++# name prefix and suffix for the backup file can be specified with the
++# -B and -z options.
++
++usage () {
++	progname="$1"
++	printf "Usage: %s [-B prefix] [-z suffix] [-f {file|-}] [-s] [-b|-r|-x] [-t] [-L] {file|-} ...\n"\
++	"\n"\
++	"\tCreate hard linked backup copies of a list of files\n"\
++	"\tread from standard input.\n"\
++	"\n"\
++	"\t-b\tCreate backup\n"\
++	"\t-r\tRestore the backup\n"\
++	"\t-x\tRemove backup files and empty parent directories\n"\
++	"\t-B\tPath name prefix for backup files\n"\
++	"\t-z\tPath name suffix for backup files\n"\
++	"\t-s\tSilent operation; only print error messages\n"\
++	"\t-f\tRead the filenames to process from file (- = standard input)\n"\
++	"\t-t\tTouch original files after restore (update their mtimes)\n\n"\
++	"\t-L\tEnsure that when finished, the source file has a link count of 1\n\n", \
++	"$progname"
++}
++
++link_or_copy_file() {
++	from="$1"
++	to="$2"
++	if ! ln "$from" "$to" || [ -d "$to" ]; then
++		cp -dp --remove-destination "$from" "$to"
++	fi
++}
++
++ensure_nolinks() {
++	filename="$1"
++
++	link_count=$(stat -c '%h' "$filename")
++	if [ -z "$link_count" ] || [ "$link_count" -gt 1 ]; then
++		dirname=$(dirname "$filename")
++		basename=$(basename "$filename")
++		# Temp file name is "path/to/.file.XXXXXX"
++		tmpname=$(mktemp "${dirname}/.${basename}.XXXXXX")
++		cp -dp "$filename" "$tmpname"
++		mv "$tmpname" "$filename"
++	fi
++}
++
++process_file() {
++	file="$1"
++	backup="${OPT_PREFIX}${file}${OPT_SUFFIX}"
++
++	if [ "$OPT_WHAT" == "backup" ]; then
++		if [ -e "$backup" ]; then
++			rm "$backup"
++		else
++			mkdir -p "$(dirname "$backup")"
++		fi
++		if [ ! -e "$file" ]; then
++			$ECHO "New file $file"
++			touch "$backup"
++			chmod 000 "$backup"
++		else
++			$ECHO "Copying $file"
++			link_or_copy_file "$file" "$backup"
++			if [ -n "$OPT_NOLINKS" ]; then
++				ensure_nolinks "$file"
++			fi
++			if [ -n "OPT_TOUCH" ]; then
++				touch "$backup"
++			fi
++		fi
++	elif [ "$OPT_WHAT" == "restore" ]; then
++		mkdir -p "$(dirname "$file")"
++
++		if [ ! -e "$backup" ]; then
++			return 1
++		fi
++		if [ ! -s "$backup" ]; then
++			if [ -e "$file" ]; then
++				rm "$file"
++			fi
++			$ECHO "Removing $file"
++			rm "$backup"
++			while [ -d "${backup%/*}" ] && ! [ -L "${backup%/*}" ]
++			do
++				backup="${backup%/*}"
++				rmdir --ignore-fail-on-non-empty "$backup" 2>/dev/null
++				if [ -d "$backup" ]; then
++					break
++				fi
++			done
++		else
++			$ECHO "Restoring $file"
++			if [ -e "$file" ]; then
++				rm "$file"
++			fi
++			link_or_copy_file "$backup" "$file"
++			rm "$backup"
++			while [ -d "${backup%/*}" ] && ! [ -L "${backup%/*}" ]
++			do
++				backup="${backup%/*}"
++				rmdir --ignore-fail-on-non-empty "$backup" 2>/dev/null
++				if [ -d "$backup" ]; then
++					break
++				fi
++			done
++			if [ -n "$OPT_NOLINKS" ]; then
++				ensure_nolinks "$file"
++			fi
++			if [ -n "$OPT_TOUCH" ]; then
++				touch "$file"
++			fi
++		fi
++	elif [ "$OPT_WHAT" == "remove" ]; then
++		if [ -e "$backup" ]; then
++			rm "$backup"
++		fi
++		while [ -d "${backup%/*}" ] && ! [ -L "${backup%/*}" ]
++		do
++			backup="${backup%/*}"
++			rmdir --ignore-fail-on-non-empty "$backup" 2>/dev/null
++			if [ -d "$backup" ]; then
++				break
++			fi
++		done
++	elif [ "$OPT_WHAT" == "noop" ]; then
++		if [ -e "$file" ] && [ -n "$OPT_NOLINKS" ]; then
++			ensure_nolinks "$file"
++		fi
++	else
++		return 1
++	fi
++}
++
++walk() {
++	path="$1"
++	if [ ! -f "$path" ]; then
++		return 0
++	fi
++
++	if [ "${path#$OPT_PREFIX}" == "$path" ]
++	then
++		# prefix does not match
++		return 0
++	fi
++	path="${path#$OPT_PREFIX}"
++
++	if [ -n "$OPT_SUFFIX" ] && [ "${path%$OPT_SUFFIX}" == "$path" ]
++	then
++		# suffix does not match
++		return 0
++	fi
++	path="${path%$OPT_SUFFIX}"
++
++	process_file "$path"
++}
++
++
++ECHO=echo
++declare -a FILELIST
++progname="$0"
++while [ $# -gt 0 ]; do
++	case $1 in
++	-b)	OPT_WHAT=backup
++		;;
++	-r)	OPT_WHAT=restore
++		;;
++	-x)	OPT_WHAT=remove
++		;;
++	-B)	OPT_PREFIX=$2
++		shift
++		;;
++	-f)	OPT_FILE=$2
++		shift
++		;;
++	-z)	OPT_SUFFIX=$2
++		shift
++		;;
++	-s)	ECHO=:
++		;;
++	-L)	OPT_NOLINKS=1
++		;;
++	-t)	OPT_TOUCH=1
++		;;
++	-?*)	usage "$progname"
++		exit 0
++		;;
++	*)	FILELIST=($1)
++		;;
++	esac
++
++        shift
++done
++
++if [ -z "${OPT_PREFIX}${OPT_SUFFIX}" ]; then
++	usage "$progname"
++	exit 1
++fi
++if [ ${#FILELIST[@]} == 0 ] && [ -z "$OPT_FILE" ]; then
++	usage "$progname"
++	exit 1
++fi
++
++if [ -n "$OPT_FILE" ]; then
++	cat "$OPT_FILE" \
++	| while read nextfile; do
++		process_file "$nextfile"
++	done
++fi
++
++I=0
++while [ $I -lt ${#FILELIST[@]} ]; do
++
++	case "${FILELIST[$I]}" in
++	-)
++		path="${OPT_PREFIX%/*}"
++		if ! [ -n "$path" ] && [ -d "$path" ] ; then
++			I=$(($I+1))
++			continue
++		fi
++
++		find "$path" -mindepth 1 \( -type f -o -type d \) -print 2>/dev/null \
++		| while read
++		do
++			if [ -d "$REPLY" ]
++			then
++				if ! [ -r "$REPLY" ] || ! [ -x "$REPLY" ]
++				then
++					echo "$REPLY: Permission denied"
++					exit 1
++				fi
++			else
++				walk "$REPLY"
++			fi
++		done
++		if [ $? != 0 ]; then
++			exit 1
++		fi
++		;;
++	*)
++		process_file "${FILELIST[$I]}"
++		;;
++	esac
++		
++	I=$(($I+1))
++done
+--- quilt-0.45.orig/quilt/snapshot.in
++++ quilt-0.45/quilt/snapshot.in
+@@ -85,7 +85,7 @@
+ 	}
+ 	{ print }
+ ' \
+-| $QUILT_LIB/backup-files -b -s -L -f - -B "$QUILT_PC/$snap_subdir/"
++| $QUILT_DIR/scripts/backup-files -b -s -L -f - -B "$QUILT_PC/$snap_subdir/"
+ 
+ ### Local Variables:
+ ### mode: shell-script
