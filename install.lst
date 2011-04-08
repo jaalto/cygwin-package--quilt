@@ -1,0 +1,2 @@
+# Syntax: FROM [TO [MODE; */bin/* defaults to 755]]
+CYGWIN-PATCHES/quilt.txt $DOC/manual/
