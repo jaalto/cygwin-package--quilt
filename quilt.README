@@ -42,6 +42,8 @@ Runtime requirements:
 
 Build requirements:
   cygwin
+  quilt
+  gettext-devel
 
 Canonical homepage:
   http://freshmeat.net/projects/quilt
@@ -91,6 +93,8 @@ Files included in the binary distro:
 ------------------
 
 Port Notes:
+- The quilt.txt manual was copied from Debian
+
 
 ----- version 0.48-3 -----
 - Rewrite preremove and postinstall 2011-04-08 Jari Aalto
