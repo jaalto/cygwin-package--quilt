@@ -1,10 +1,10 @@
 #!/bin/bash
-# This file compiles debian patched from DIR (downloaded there)
-# The debian version is announced in stamp file *.debian
+# This file compiles debian patches from DIR (extracted there)
 
 NAME=quilt
+
 VER=_*[0-9]*-[0-9]*
-EXT=.debian
+EXT=.debian.tar.gz
 DIR=patches.tmp
 
 
