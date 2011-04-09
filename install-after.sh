@@ -28,18 +28,6 @@ Main()
         Cmd install -m 755 -d $dir/manual
         Cmd install -m 755 CYGWIN-PATCHES/quilt.txt $dir/manual/
 
-        #  relocate configuration file. Don't stamp on user's settings.
-
-        file=$(ls $root/etc/*rc)
-
-        [ ! "$file" ] && return 1
-
-        defaults=$root/etc/defaults
-
-        Cmd install -m 755 -d $defaults
-
-        Cmd mv $file $defaults
-
     fi
 }
 
