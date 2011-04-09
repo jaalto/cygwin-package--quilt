@@ -27,7 +27,7 @@ is unique. All commands print some help text with "quilt <cmd> -h".
 CHANGES SINCE LAST RELEASE
 ==========================
 
-- [Cygwin] Correct postinstall script.
+- Patches from Debian project are included.
 
 INSTALL OR UPGRADE NOTES
 ========================
