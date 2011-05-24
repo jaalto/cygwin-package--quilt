@@ -1,5 +1,5 @@
 To: cygwin-announce@cygwin.com
-Subject: Updated: quilt-0.48-3 -- Tool to work with series of patches
+Subject: Updated: quilt-0.48-3 0.48-4 -- Tool to work with series of patches
 --text follows this line--
 
 PACKAGE DESCRIPTION
@@ -27,7 +27,7 @@ is unique. All commands print some help text with "quilt <cmd> -h".
 CHANGES SINCE LAST RELEASE
 ==========================
 
-- Patches from Debian project are included.
+- Cygwin packaging fixed.
 
 INSTALL OR UPGRADE NOTES
 ========================

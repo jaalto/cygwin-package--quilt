@@ -75,15 +75,15 @@ Language:
 ------------------------------------
 
 Build instructions:
-  unpack quilt-0.48-3-src.tar.bz2
+  unpack quilt-0.48-4-src.tar.bz2
     if you use setup to install this src package, it will be
     unpacked under /usr/src automatically
   cd /usr/src
   ./quilt*.sh all
 
 This will create:
-  quilt-0.48-3.tar.bz2
-  quilt-0.48-3-src.tar.bz2
+  quilt-0.48-4.tar.bz2
+  quilt-0.48-4-src.tar.bz2
 
 -------------------------------------------
 
@@ -95,6 +95,9 @@ Files included in the binary distro:
 Port Notes:
 - The quilt.txt manual was copied from Debian
 
+
+----- version 0.48-4 -----
+- Fix packaging 2011-05-24 Jari Aalto
 
 ----- version 0.48-3 -----
 - Rewrite preremove and postinstall 2011-04-08 Jari Aalto
