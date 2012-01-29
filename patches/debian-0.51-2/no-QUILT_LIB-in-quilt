@@ -1,0 +1,15 @@
+Index: quilt-0.46/bin/quilt.in
+===================================================================
+--- quilt-0.46.orig/bin/quilt.in	2007-04-19 07:07:31.000000000 +0000
++++ quilt-0.46/bin/quilt.in	2007-04-19 07:07:52.000000000 +0000
+@@ -9,8 +9,8 @@
+ export TEXTDOMAIN=quilt
+ export TEXTDOMAINDIR=@LOCALEDIR@
+ 
+-: ${QUILT_DIR=@QUILT_DIR@} ${QUILT_LIB=@QUILT_LIB@}
+-export QUILT_DIR QUILT_LIB
++: ${QUILT_DIR=@QUILT_DIR@}
++export QUILT_DIR
+ 
+ if [ -z "$QUILTRC" ]
+ then

@@ -1,0 +1,21 @@
+backport-fixes-from-0.50
+fix-manpage-generation		  # Integrated upstream
+arch_all
+debianize
+fail_on_missing
+return2
+makefile_glitche                  # Easy target of upstream integration
+# Works only with patch 2.6 and newer currently and we don't want to break
+# backports (see #560621 for discussion)
+# test_broken_patches
+check_SERIES_exists
+patch-wrapper_do_depend_on_proc
+override_mail_sender_in_testsuite # Easy target of upstream integration
+mail-signature
+no-signature-test
+mail-from-locale
+unset_posix_strict_conformance_variables
+shell-subcommand
+use-sensible-editor
+fix-test-setup
+dep3_headers

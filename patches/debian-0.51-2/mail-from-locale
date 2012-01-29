@@ -1,0 +1,43 @@
+From: Simon Horman <horms@verge.net.au>
+Date: Thu, 19 Apr 2007 17:39:07 +0900
+Subject: Force locale to C when generating date for From header
+
+Without this the From header will end up with a date according
+to the pervailing locale, which I believe results in an invalid
+mbox - muttng doesn't like it anyway.
+
+Tested with the following environment:
+
+# LANG=ja_JP.utf8
+LANGUAGE=ja_JP.utf8
+LC_CTYPE="ja_JP.utf8"
+LC_NUMERIC="ja_JP.utf8"
+LC_TIME="ja_JP.utf8"
+LC_COLLATE="ja_JP.utf8"
+LC_MONETARY="ja_JP.utf8"
+LC_MESSAGES="ja_JP.utf8"
+LC_PAPER="ja_JP.utf8"
+LC_NAME="ja_JP.utf8"
+LC_ADDRESS="ja_JP.utf8"
+LC_TELEPHONE="ja_JP.utf8"
+LC_MEASUREMENT="ja_JP.utf8"
+LC_IDENTIFICATION="ja_JP.utf8"
+LC_ALL=ja_JP.utf8
+
+Upstream status: submitted on 110915
+
+---
+ quilt/mail.in |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/quilt/mail.in
++++ b/quilt/mail.in
+@@ -141,7 +141,7 @@ process_mail()
+ 		| ${QUILT_SENDMAIL:-sendmail} \
+ 			${QUILT_SENDMAIL_ARGS--f "$opt_sender"} "$@"
+ 	else
+-		local from_date=$(date "+%a %b %e %H:%M:%S %Y")
++		local from_date=$(LC_ALL=C date "+%a %b %e %H:%M:%S %Y")
+ 		echo "From $opt_sender_address $from_date"
+ 		sed -e 's/^From />From /' $tmpfile
+ 		echo

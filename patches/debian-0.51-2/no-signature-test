@@ -1,0 +1,55 @@
+From: Simon Horman <horms@verge.net.au>
+Date: Thu, 19 Apr 2007 17:39:07 +0900
+Subject: Use the new --signature option in mail tests
+
+Make use of the --signature option to specify that there should
+be no .signature file used. Without this .signature will get sucked in
+if present and if this is the case the test will fail as the expected
+output will differ from the actuall output as the latter will contain
+the contents of .signature while the fomer doesn't.
+
+I guess the test could be changed so as not to compare the signature
+portion, but as this seems like a nice enough solution.
+
+---
+ test/mail.test |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+--- a/test/mail.test
++++ b/test/mail.test
+@@ -10,7 +10,7 @@
+ 
+ 	$ cat no-subject > patches/1.diff
+ 	$ ls patches/ > series
+-	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" --subject "This is a test" -m "Message" --signature -
+ 	> Unable to extract a subject header from patches/1.diff
+ 
+ 	$ cat - no-subject > patches/1.diff
+@@ -19,7 +19,7 @@
+ 	< Acked-by: Dummy <dummy@some.where>
+ 	<
+ 
+-	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" -m "Message"
++	$ quilt mail --sender quilt@noreply.org --mbox mbox --prefix "test" -m "Message" --signature -
+ 	> Introduction has no subject header
+ 
+ 	$ cat - no-subject > patches/2.diff
+@@ -53,7 +53,7 @@
+ 	<
+ 
+ 	$ ls patches/ > series
+-	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message" --signature -
+ 	> Patches patches/1.diff, patches/5.diff have duplicate subject headers.
+ 
+ 	$ cat - no-subject > patches/5.diff
+@@ -65,7 +65,7 @@
+ 	<
+ 
+ 	$ ls patches/ > series
+-	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message"
++	$ quilt mail --mbox mbox --prefix "test" --subject "This is a test" -m "Message" --signature -
+ 	$ sed -nre "s/^(From [^ ]*).*/\\1/p" -e "/^Subject:/p" -e "/^To:/p" -e "/^Cc:/p" -e "/^ /p" -e "/^Replace-.*:/p" -e "/^Recipient-.*:/p" mbox
+ 	> From a@b.c
+ 	> Subject: [test 0/6] This is a test
