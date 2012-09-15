@@ -24,12 +24,12 @@ Main()
 
         root=$(echo $root | sed 's,/$,,')  # Delete trailing slash
 
-        dir=$(cd $root/usr/share/doc/*-*/ && pwd)
+        dir=$root/usr/share/doc/quilt
         Cmd install -m 755 -d $dir/manual
         Cmd install -m 755 CYGWIN-PATCHES/quilt.txt $dir/manual/
 
 	# Fix permissions
-	Cmd chmod +x $root/usr/share/quilt/scripts/*
+	(Cmd cd $root/usr/share/quilt/scripts/ && Cmd chmod 755 *)
 
     fi
 }
