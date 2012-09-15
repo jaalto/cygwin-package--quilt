@@ -1,5 +1,5 @@
 To: cygwin-announce@cygwin.com
-Subject: Updated: quilt-0.48-4 -- Tool to work with series of patches
+Subject: Updated: 0.60-1 -- Tool to work with series of patches
 --text follows this line--
 
 PACKAGE DESCRIPTION
@@ -27,12 +27,13 @@ is unique. All commands print some help text with "quilt <cmd> -h".
 CHANGES SINCE LAST RELEASE
 ==========================
 
-- Cygwin packaging fixed.
+- Use $EDITOR in commands
+- Scrips directory executable flags corrected.
 
 INSTALL OR UPGRADE NOTES
 ========================
 
-None.
+Standard install.
 
 CYGWIN INSTALLATION INFORMATION
 ===============================
