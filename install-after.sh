@@ -28,6 +28,9 @@ Main()
         Cmd install -m 755 -d $dir/manual
         Cmd install -m 755 CYGWIN-PATCHES/quilt.txt $dir/manual/
 
+	# Fix permissions
+	Cmd chmod +x $root/usr/share/quilt/scripts/*
+
     fi
 }
 
