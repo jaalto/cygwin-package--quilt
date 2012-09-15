@@ -8,4 +8,4 @@ version control system. The stacked organization proved to be
 efficient for the management of very large patch sets (more than
 hundred patches)."
 category: Devel
-requires: cygwin bzip2 diffutils patch perl util-linux
+requires: bzip2 diffutils patch perl util-linux
