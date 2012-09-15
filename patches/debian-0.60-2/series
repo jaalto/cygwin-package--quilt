@@ -6,6 +6,6 @@ return2
 check_SERIES_exists
 patch-wrapper_do_depend_on_proc
 shell-subcommand
-use-sensible-editor
+# use-sensible-editor
 fix-test-setup
 dep3_headers
