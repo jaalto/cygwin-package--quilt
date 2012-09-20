@@ -28,7 +28,7 @@ CHANGES SINCE LAST RELEASE
 ==========================
 
 - Use $EDITOR in commands
-- Scrips directory executable flags corrected.
+- Executable flags of files in in Quilt script directory corrected.
 
 INSTALL OR UPGRADE NOTES
 ========================
@@ -44,7 +44,7 @@ system. Then, run setup and answer all of the questions. You'll find
 the package listed in the "All" category. After installation, read the
 documentation at directories:
 
-    /usr/share/doc/<package-version>/*
+    /usr/share/doc/<package>/*
     /usr/share/doc/Cygwin/<package-version>.README
 
 If you have questions or comments, please send them to the Cygwin
