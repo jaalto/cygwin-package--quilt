@@ -1,3 +1,4 @@
+dep3mail
 fail_on_missing
 return2
 # Works only with patch 2.6 and newer currently and we don't want to break
@@ -6,6 +7,11 @@ return2
 check_SERIES_exists
 patch-wrapper_do_depend_on_proc
 shell-subcommand
-# use-sensible-editor
-fix-test-setup
+use-sensible-editor
+setup-dont-read-pc
 dep3_headers
+graph_depends_on_graphviz
+push_timeskew
+unset_grep_options
+diff_exit_code
+select-mail

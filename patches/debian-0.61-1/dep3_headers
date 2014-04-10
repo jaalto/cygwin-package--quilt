@@ -19,9 +19,15 @@ NOTE: Even if DEP-3 has started within Debian, it has been written as a
 vendor neutral specification and this patch should be forwarded upstream
 too. --Raphael Hertzog
 
+---
+ quilt/header.in |   30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+Index: b/quilt/header.in
+===================================================================
 --- a/quilt/header.in
 +++ b/quilt/header.in
-@@ -19,7 +19,7 @@ fi
+@@ -19,7 +19,7 @@
  
  usage()
  {
@@ -30,7 +36,7 @@ too. --Raphael Hertzog
  
  	if [ x$1 = x-h ]
  	then
-@@ -39,6 +39,10 @@ Print or change the header of the topmos
+@@ -39,6 +39,10 @@
  
  --backup
  	Create a backup copy of the old version of a patch as patch~.
@@ -41,7 +47,7 @@ too. --Raphael Hertzog
  " "$EDITOR"
  		exit 0
  	else
-@@ -66,7 +70,7 @@ maybe_strip_diffstat()
+@@ -66,7 +70,7 @@
  	fi
  }
  
@@ -50,7 +56,7 @@ too. --Raphael Hertzog
  
  if [ $? -ne 0 ]
  then
-@@ -90,6 +94,9 @@ do
+@@ -90,6 +94,9 @@
  	--backup)
  		QUILT_BACKUP=1
  		shift ;;
@@ -60,7 +66,7 @@ too. --Raphael Hertzog
  	--strip-diffstat)
  		opt_strip_diffstat=1
  		shift ;;
-@@ -147,6 +154,25 @@ else
+@@ -147,6 +154,25 @@
  		fi
  	) > $tmp
  

@@ -74,15 +74,15 @@ Language:
 ------------------------------------
 
 Build instructions:
-  unpack quilt-0.60-1-src.tar.bz2
+  unpack quilt-0.61-1-src.tar.bz2
     if you use setup to install this src package, it will be
     unpacked under /usr/src automatically
   cd /usr/src
   ./quilt*.sh all
 
 This will create:
-  quilt-0.60-1.tar.bz2
-  quilt-0.60-1-src.tar.bz2
+  quilt-0.61-1.tar.bz2
+  quilt-0.61-1-src.tar.bz2
 
 -------------------------------------------
 
@@ -94,6 +94,9 @@ Files included in the binary distro:
 Port Notes:
 - The quilt.txt manual was copied from Debian
 
+
+----- version 0.61-1 -----
+- New upstream release 2014-04-10 Jari Aalto
 
 ----- version 0.60-1 -----
 - New upstream release 2012-09-15 Jari Aalto
@@ -136,4 +139,4 @@ Port Notes:
   http://sourceware.org/ml/cygwin-apps/2006-02/msg00073.html (GTG)
 
 Cygwin port maintained by: Jari Aalto <jari.aalto@cante.net>
-Copyright (C) 2006-2012 Jari Aalto; Licensed under GPL v2 or later
+Copyright (C) 2006-2014 Jari Aalto; Licensed under GPL v2 or later
