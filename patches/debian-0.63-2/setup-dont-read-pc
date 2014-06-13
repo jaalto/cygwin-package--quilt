@@ -10,7 +10,7 @@ Description: setup don't obey the settings of any englobing .pc
  .pc directory found, and reset QUILT_PC QUILT_PATCHES and QUILT_SERIES
  to their default values.
 Bug-Debian: http://bugs.debian.org/573689
-Forwarded: should be forwarded
+Forwarded: 2014-01-18
 
 ---
  quilt/setup.in |    5 +++++

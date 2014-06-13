@@ -87,10 +87,10 @@ Index: b/bash_completion
 ===================================================================
 --- a/bash_completion
 +++ b/bash_completion
-@@ -97,7 +97,7 @@
-     # quilt sub commands 
+@@ -102,7 +102,7 @@
+     # quilt sub commands
      cmds='add annotate applied delete diff edit files fold fork graph \
-           grep header import mail new next patches pop previous push refresh \
+ 	  grep header import mail new next patches pop previous push refresh \
 -	  remove rename revert series setup snapshot top unapplied'
 +	  remove rename revert series setup shell snapshot top unapplied'
  

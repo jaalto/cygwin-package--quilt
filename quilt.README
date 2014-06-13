@@ -74,15 +74,15 @@ Language:
 ------------------------------------
 
 Build instructions:
-  unpack quilt-0.61-1-src.tar.bz2
+  unpack quilt-0.63-1-src.tar.bz2
     if you use setup to install this src package, it will be
     unpacked under /usr/src automatically
   cd /usr/src
   ./quilt*.sh all
 
 This will create:
-  quilt-0.61-1.tar.bz2
-  quilt-0.61-1-src.tar.bz2
+  quilt-0.63-1.tar.xz
+  quilt-0.63-1-src.tar.xz
 
 -------------------------------------------
 
@@ -94,6 +94,9 @@ Files included in the binary distro:
 Port Notes:
 - The quilt.txt manual was copied from Debian
 
+
+----- version 0.63-1 -----
+- New upstream release 2014-06-13 Jari Aalto
 
 ----- version 0.61-1 -----
 - New upstream release 2014-04-10 Jari Aalto

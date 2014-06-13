@@ -27,7 +27,7 @@ Index: b/quilt/push.in
  
  -a	Apply all patches in the series file.
  
-@@ -209,18 +210,29 @@
+@@ -210,18 +211,29 @@
  			touch "$QUILT_PC/$patch~refresh"
  		fi
  
@@ -65,7 +65,7 @@ Index: b/quilt/scripts/backup-files.in
 ===================================================================
 --- a/quilt/scripts/backup-files.in
 +++ b/quilt/scripts/backup-files.in
-@@ -181,8 +181,9 @@
+@@ -184,8 +184,9 @@
  			done < "$NONEMPTY_FILES"
  		fi
  

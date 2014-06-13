@@ -1,17 +1,17 @@
-dep3mail
+test-completion
+dep3mail            ### Sent 2014-01-18
+check_SERIES_exists ### Sent 2014-01-18
+setup-dont-read-pc  ### Sent 2014-01-18
+graph_depends_on_graphviz ### Sent 2014-01-18
+
+restrict-patch-names
 fail_on_missing
-return2
 # Works only with patch 2.6 and newer currently and we don't want to break
 # backports (see #560621 for discussion)
 # test_broken_patches
-check_SERIES_exists
-patch-wrapper_do_depend_on_proc
 shell-subcommand
 use-sensible-editor
-setup-dont-read-pc
 dep3_headers
-graph_depends_on_graphviz
 push_timeskew
-unset_grep_options
-diff_exit_code
-select-mail
+
+
