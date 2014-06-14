@@ -45,16 +45,20 @@ Build requirements:
   gettext-devel
 
 Canonical homepage:
-  http://freshmeat.net/projects/quilt
+  https://freecode.com/projects/quilt
   http://packages.debian.org/quilt
+  http://savannah.nongnu.org/projects/quilt
 
 Canonical download:
   http://download.savannah.gnu.org/releases/quilt
 
 Version control repository:
-  http://savannah.nongnu.org/cvs/?group=quilt
+  http://git.savannah.gnu.org/cgit/quilt.git
+  http://savannah.nongnu.org/git/?group=quilt
+  git clone git://git.sv.gnu.org/quilt.git
 
 Mailing List:
+  http://savannah.nongnu.org/mail/?group=quilt
   http://dir.gmane.org/gmane.comp.version-control.quilt.devel
 
 IRC channel:
