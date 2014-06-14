@@ -5,7 +5,7 @@ Subject: Updated: quilt 0.63-1 -- Tool to work with series of patches
 PACKAGE DESCRIPTION
 ===================
 
-Homepage: http://freshmeat.net/projects/quilt
+Homepage: https://freecode.com/projects/quilt
 License : GPL
 
 Tool to work with series of patches
@@ -27,8 +27,7 @@ is unique. All commands print some help text with "quilt <cmd> -h".
 CHANGES SINCE LAST RELEASE
 ==========================
 
-- Use $EDITOR in commands
-- Executable flags of files in in Quilt script directory corrected.
+See homepage
 
 INSTALL OR UPGRADE NOTES
 ========================
