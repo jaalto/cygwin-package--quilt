@@ -1,3 +1,4 @@
+# ARCH=noarch
 sdesc: "Tool to work with series of patches"
 ldesc: "Program manages a series of patches by keeping track of the
 changes each of them makes. They are logically organized as a stack,
