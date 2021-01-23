@@ -3,4 +3,5 @@
 #
 #
 --exclude=*.po
+--exclude=git-desc
 --exclude=symlink_pc.test.ignoreme
