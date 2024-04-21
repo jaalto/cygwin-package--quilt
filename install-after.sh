@@ -31,6 +31,8 @@ Main()
 	# Fix permissions
 	(Cmd cd $root/usr/share/quilt/scripts/ && Cmd chmod 755 *)
 
+        # Disable Google cloud module
+        sed -i "s,^[^#],#," $root/usr/share/quilt/compat/cp
     fi
 }
 
